@@ -57,6 +57,28 @@ class PhoreUri
         return new PhoreUri($this->uri .= "/" . implode("/", $ret));
     }
 
+    public function withRelativePath (string $relpath) : PhoreUri
+    {
+        $parts = explode("/", $this->uri . "/"  . $relpath);
+        $ret = [];
+        foreach ($parts as $part) {
+            if ($part == "")
+                continue;
+            if ($part == "." || $part == "")
+                continue;
+            if ($part == "..") {
+                if (count ($ret) == 0)
+                    throw new PathOutOfBoundsException("SubPath is out of bounds: $relpath");
+                array_pop($ret);
+                continue;
+            }
+            $ret[] = $part;
+        }
+
+        return new PhoreUri(implode("/", $ret));
+    }
+
+
     public function isDirectory () : bool
     {
         return file_exists($this->uri) && is_dir($this->uri);

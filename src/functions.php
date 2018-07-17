@@ -6,7 +6,7 @@
  * Time: 15:16
  */
 
-function phore_path(string $path) : \Phore\FileSystem\PhoreUri
+function phore_uri(string $uri) : \Phore\FileSystem\PhoreUri
 {
-    return new \Phore\FileSystem\PhoreUri($path);
+    return new \Phore\FileSystem\PhoreUri($uri);
 }
