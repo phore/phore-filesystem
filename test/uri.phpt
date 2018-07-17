@@ -28,11 +28,12 @@ Assert::exception(function () use ($p) {
     $p->assertFile();
 }, FilesystemException::class);
 
+// Subpath is always inside directory
 Assert::exception(function() use ($p) {
     $p->withSubPath("../some/file");
 }, PathOutOfBoundsException::class);
 
-
+// Relative Path may exceed directory boundaries
 Assert::equal(__DIR__ , (string)$p->withRelativePath("../"));
 
 
