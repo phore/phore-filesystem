@@ -1,0 +1,26 @@
+{
+  "name": "phore/filesystem",
+  "type": "library",
+  "license": "MIT",
+  "authors": [
+    {
+      "name": "Matthias Leuffen",
+      "email": "leuffen@continue.de"
+    }
+  ],
+  "autoload": {
+    "psr-4": {
+      "Phore\\FileSystem\\": "src/"
+    },
+    "files": [
+      "src/functions.php"
+    ]
+  },
+  "require": {
+    "php" : ">7.1",
+    "ext-yaml": "*"
+  },
+  "suggest": {
+  },
+  "minimum-stability": "dev"
+}

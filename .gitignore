@@ -1,0 +1,6 @@
+/.idea
+/vendor
+/.project
+/composer.lock
+
+/src/Pack/Adminator/adminator
