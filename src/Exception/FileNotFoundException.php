@@ -9,7 +9,7 @@
 namespace Phore\FileSystem\Exception;
 
 
-class FileNotFoundException extends FileSystemException
+class FileNotFoundException extends FilesystemException
 {
 
 }

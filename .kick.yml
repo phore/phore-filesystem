@@ -8,3 +8,6 @@ apache_fallback_resource: "/index.php"
 command:
   init:
     - "composer update"
+
+  test:
+    - "tester -C test/php.ini test/"

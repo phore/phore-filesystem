@@ -18,7 +18,11 @@
   },
   "require": {
     "php" : ">7.1",
-    "ext-yaml": "*"
+    "ext-yaml": "*",
+    "ext-json": "*"
+  },
+  "require-dev": {
+    "nette/tester": "*"
   },
   "suggest": {
   },

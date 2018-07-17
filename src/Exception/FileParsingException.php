@@ -9,7 +9,7 @@
 namespace Phore\FileSystem\Exception;
 
 
-class FileParsingException extends FileSystemException
+class FileParsingException extends FilesystemException
 {
 
 }

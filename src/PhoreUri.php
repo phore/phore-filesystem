@@ -11,6 +11,7 @@ namespace Phore\FileSystem;
 
 use Phore\FileSystem\Exception\FileAccessException;
 use Phore\FileSystem\Exception\FileNotFoundException;
+use Phore\FileSystem\Exception\FilesystemException;
 use Phore\FileSystem\Exception\PathOutOfBoundsException;
 
 class PhoreUri
@@ -53,13 +54,24 @@ class PhoreUri
             }
             $ret[] = $part;
         }
-
-        return new PhoreUri($this->uri .= "/" . implode("/", $ret));
+        $startUri = $this->uri;
+        if ($this instanceof PhoreFile) {
+            $startUri = dirname($startUri);
+        }
+        return new PhoreUri($startUri .= "/" . implode("/", $ret));
     }
 
     public function withRelativePath (string $relpath) : PhoreUri
     {
-        $parts = explode("/", $this->uri . "/"  . $relpath);
+        $startUri = $this->uri;
+        if ($this instanceof PhoreFile) {
+            $startUri = dirname($startUri);
+        }
+        $prefix = "";
+        if (substr($startUri, 0, 1) === "/")
+            $prefix = "/"; // Absolute path
+
+        $parts = explode("/", $startUri . "/"  . $relpath);
         $ret = [];
         foreach ($parts as $part) {
             if ($part == "")
@@ -75,7 +87,7 @@ class PhoreUri
             $ret[] = $part;
         }
 
-        return new PhoreUri(implode("/", $ret));
+        return new PhoreUri($prefix . implode("/", $ret));
     }
 
 
@@ -94,7 +106,7 @@ class PhoreUri
     {
         if (file_exists($this->uri) && is_dir($this->uri))
             return new PhoreDirectory($this->uri);
-        throw new FileNotFoundException("Uri '$this->uri' is not a valid directory.");
+        throw new FilesystemException("Uri '$this->uri' is not a valid directory.");
     }
 
 
@@ -103,7 +115,7 @@ class PhoreUri
     {
         if (file_exists($this->uri) && is_file($this->uri))
             return new PhoreFile($this->uri);
-        throw new FileNotFoundException("Uri '$this->uri' is not a valid file.");
+        throw new FilesystemException("Uri '$this->uri' is not a valid file.");
     }
 
     public function assertReadable () : self

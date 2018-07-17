@@ -9,7 +9,7 @@
 namespace Phore\FileSystem\Exception;
 
 
-class PathOutOfBoundsException extends FileSystemException
+class PathOutOfBoundsException extends FilesystemException
 {
 
 }
