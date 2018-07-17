@@ -37,3 +37,8 @@ echo phore_path("/tmp")->withSubPath("./some/other/file")
 phore_path("/tmp")->assertIsFile()->assertIsWritable();
 ```
 
+## Reading YAML
+
+```
+phore_path("/tmp/somefile.yml")->asFile()->get_yaml();
+```
