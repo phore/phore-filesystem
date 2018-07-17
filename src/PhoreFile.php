@@ -14,22 +14,14 @@ use Phore\FileSystem\Exception\FileNotFoundException;
 use Phore\FileSystem\Exception\FileParsingException;
 use Phore\FileSystem\Exception\PathOutOfBoundsException;
 
-class File
+class PhoreFile extends PhoreUri
 {
-    public function __construct(string $filename)
-    {
-        $this->filename = $filename;
-    }
-    public function path() : Path
-    {
-        return new Path($this->filename);
-    }
 
     public function fopen(string $mode) : FileStream
     {
-        $fp = @fopen($this->filename, $mode);
+        $fp = @fopen($this->uri, $mode);
         if ( ! $fp)
-            throw new FileAccessException("fopen($this->filename): " . error_get_last()["message"]);
+            throw new FileAccessException("fopen($this->uri): " . error_get_last()["message"]);
         return new FileStream($fp, $this);
     }
 
@@ -57,7 +49,7 @@ class File
      *
      * @param string|null $setContent
      *
-     * @return File|string
+     * @return PhoreFile|string
      * @throws FileAccessException
      */
     public function get_contents()
@@ -88,7 +80,7 @@ class File
     /**
      * @param string $appendContent
      *
-     * @return File
+     * @return PhoreFile
      */
     public function append_content(string $appendContent) : self
     {
@@ -102,7 +94,7 @@ class File
 
     public function fileSize () : int
     {
-        return filesize($this->filename);
+        return filesize($this->uri);
     }
 
     /**
@@ -123,7 +115,7 @@ class File
         if ($ret === false) {
             $err = error_get_last();
             throw new FileParsingException(
-                "YAML Parsing of file '{$this->filename}' failed: {$err["message"]}",
+                "YAML Parsing of file '{$this->uri}' failed: {$err["message"]}",
                 0
             );
         }
@@ -141,7 +133,7 @@ class File
         $json = json_decode($this->get_contents(), true);
         if ($json === null) {
             throw new FileParsingException(
-                "JSON Parsing of file '{$this->filename}' failed: " . json_last_error_msg()
+                "JSON Parsing of file '{$this->uri}' failed: " . json_last_error_msg()
             );
         }
         return $json;
@@ -158,46 +150,26 @@ class File
         $serialize = unserialize($this->get_contents());
         if ($serialize === null) {
             throw new FileParsingException(
-                "Unserialize of file '{$this->filename}' failed."
+                "Unserialize of file '{$this->uri}' failed."
             );
         }
         return $serialize;
     }
 
-    public function isDirectory () : bool
-    {
-        return file_exists($this->filename) && is_dir($this->filename);
-    }
-
-    public function isFile () : bool
-    {
-        return file_exists($this->filename) && is_file($this->filename);
-    }
 
     public function rename ($newName) : self
     {
-        if ( ! @rename($this->filename, $newName))
-            throw new FileAccessException("Cannot rename file '{$this->filename}' to '{$newName}': " . implode(" ", error_get_last()));
+        if ( ! @rename($this->uri, $newName))
+            throw new FileAccessException("Cannot rename file '{$this->uri}' to '{$newName}': " . implode(" ", error_get_last()));
         $this->filename = $newName;
         return $this;
     }
 
     public function unlink() : self
     {
-        if ( ! @unlink($this->filename))
-            throw new FileAccessException("Cannot unlink file '{$this->filename}': " . implode(" ", error_get_last()));
+        if ( ! @unlink($this->uri))
+            throw new FileAccessException("Cannot unlink file '{$this->uri}': " . implode(" ", error_get_last()));
         return $this;
     }
 
-    public function mustExist()
-    {
-        if ( ! file_exists($this->filename))
-            throw new FileNotFoundException("File '$this->filename' not found");
-        return $this;
-    }
-
-    public function __toString()
-    {
-        return $this->filename;
-    }
 }

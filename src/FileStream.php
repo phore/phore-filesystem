@@ -16,10 +16,10 @@ class FileStream
 {
     private $res;
     /**
-     * @var File
+     * @var PhoreFile
      */
     private $file;
-    public function __construct($res, File $file)
+    public function __construct($res, PhoreFile $file)
     {
         $this->res = $res;
         $this->file = $file;
@@ -58,7 +58,7 @@ class FileStream
             throw new FileAccessException("Cannot get fgets('$this->file'): " . error_get_last()["message"]);
         return $this;
     }
-    public function fclose() : File {
+    public function fclose() : PhoreFile {
         if (false === @fclose($this->res))
             throw new FileAccessException("Cannot get fgets('$this->file'): " . error_get_last()["message"]);
         return $this->file;
