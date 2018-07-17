@@ -32,6 +32,12 @@ class Path
     }
 
 
+    public function withDirName() : self
+    {
+        return new self(dirname($this->path));
+    }
+
+
     public function withSubPath (string $subpath) : self
     {
         $parts = explode("/", $subpath);
