@@ -2,6 +2,10 @@
 File access functions
 
 
+- Working with sub-paths 
+- Checking symbolic links
+
+
 ## Installation
 
 ```
@@ -12,7 +16,7 @@ compser require phore/filesystem
 ## General usage
 
 ```php
-echo phore_path("/tmp/some.file")->withDirName();
+echo phore_uri("/tmp/some.file")->withDirName();
 ```
 
 will result in
@@ -24,7 +28,7 @@ will result in
 ## Subpath
 
 ```php
-echo phore_path("/tmp")->withSubPath("./some/other/file")
+echo phore_uri("/tmp")->withSubPath("./some/other/file")
 ```
 
 ```
@@ -34,11 +38,11 @@ echo phore_path("/tmp")->withSubPath("./some/other/file")
 ## Assertions
 
 ```php
-phore_path("/tmp")->assertIsFile()->assertIsWritable();
+phore_uri("/tmp")->assertIsFile()->assertIsWritable();
 ```
 
 ## Reading YAML
 
-```
-phore_path("/tmp/somefile.yml")->asFile()->get_yaml();
+```php
+phore_uri("/tmp/somefile.yml")->assertFile()->get_yaml();
 ```

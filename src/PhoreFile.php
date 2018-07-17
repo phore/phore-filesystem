@@ -103,7 +103,7 @@ class PhoreFile extends PhoreUri
      * @return $this|array
      * @throws \Exception
      */
-    public function get_yaml()
+    public function get_yaml() : array
     {
         try {
             $textData = $this->get_contents();
@@ -128,7 +128,7 @@ class PhoreFile extends PhoreUri
      * @return $this|array
      * @throws FileParsingException
      */
-    public function get_json()
+    public function get_json() : array
     {
         $json = json_decode($this->get_contents(), true);
         if ($json === null) {
@@ -145,7 +145,7 @@ class PhoreFile extends PhoreUri
      * @return $this|array
      * @throws FileParsingException
      */
-    public function get_serialized()
+    public function get_serialized() : array
     {
         $serialize = unserialize($this->get_contents());
         if ($serialize === null) {
