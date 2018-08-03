@@ -69,4 +69,15 @@ class FileStream
         return $this->file;
     }
 
+    public function seek(int $offset) : self
+    {
+        fseek($this->res, $offset);
+        return $this;
+    }
+
+    public function getRessource()
+    {
+        return $this->res;
+    }
+
 }
