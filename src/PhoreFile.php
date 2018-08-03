@@ -190,6 +190,12 @@ class PhoreFile extends PhoreUri
     }
 
 
+    public function getFilesize() : int
+    {
+        return filesize($this->uri);
+    }
+
+
     public function rename ($newName) : self
     {
         if ( ! @rename($this->uri, $newName))
