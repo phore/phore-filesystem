@@ -163,13 +163,15 @@ class PhoreFile extends PhoreUri
 
     public function withCsvOptions(bool $parseHeader=false, string $delimiter=",", string $enclosure='"', string $escape="\\") : self
     {
-        $this->csvOptions = [
+        $new = clone ($this);
+        $new->csvOptions = [
             "parseHeader" => $parseHeader,
             "delimiter" => $delimiter,
             "enclosure" => $enclosure,
             "escape" => $escape,
             "headerMap" => null
         ];
+        return $new;
     }
 
     public function walkCSV (callable $callback) : bool

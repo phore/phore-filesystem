@@ -22,7 +22,7 @@ class PhoreDirectory extends PhoreUri
     }
 
 
-    public function walk(callable $fn) : bool
+    public function walk(callable $fn, string $filter=null) : bool
     {
         $dir = opendir($this->path);
         if (!$dir)
@@ -30,6 +30,12 @@ class PhoreDirectory extends PhoreUri
         while (($curSub = readdir($dir)) !== false) {
             if ($curSub == "." || $curSub == "..")
                 continue;
+
+            if ($filter !== null) {
+                if ( ! fnmatch($filter, $curSub)) {
+                    continue;
+                }
+            }
 
             $path = $this->withSubPath($dir);
             if ($path->isFile())
@@ -45,14 +51,14 @@ class PhoreDirectory extends PhoreUri
         return true;
     }
 
-    public function walkR(callable $fn) : bool
+    public function walkR(callable $fn, string $filter=null) : bool
     {
-        return $this->walk(function (PhoreUri $uri) use ($fn) {
+        return $this->walk(function (PhoreUri $uri) use ($fn, $filter) {
             if ($uri->isDirectory()) {
-                return $uri->asDirectory()->walkR($fn);
+                return $uri->asDirectory()->walkR($fn, $filter);
             }
             return $fn($uri);
-        });
+        }, $filter);
     }
 
 
@@ -60,12 +66,12 @@ class PhoreDirectory extends PhoreUri
      * @return PhoreUri[]
      * @throws FileAccessException
      */
-    public function getListSorted() : array
+    public function getListSorted(string $filter=null) : array
     {
         $ret = [];
         $this->walk(function(PhoreUri $uri) use (&$ret) {
             $ret[] = $uri;
-        });
+        }, $filter);
         sort($ret, function (PhoreUri $a, PhoreUri $b) {
             if ((string)$a == (string)$b)
                 return 0;
