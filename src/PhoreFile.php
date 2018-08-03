@@ -153,6 +153,43 @@ class PhoreFile extends PhoreUri
     }
 
 
+    private $csvOptions = [
+        "parseHeader" => false,
+        "delimiter" => ",",
+        "enclosure" => '"',
+        "escape" => "\\",
+        "headerMap" => null
+    ];
+
+    public function withCsvOptions(bool $parseHeader=false, string $delimiter=",", string $enclosure='"', string $escape="\\") : self
+    {
+        $this->csvOptions = [
+            "parseHeader" => $parseHeader,
+            "delimiter" => $delimiter,
+            "enclosure" => $enclosure,
+            "escape" => $escape,
+            "headerMap" => null
+        ];
+    }
+
+    public function walkCSV (callable $callback) : bool
+    {
+        if ($this->csvOptions["parseHeader"] === true) {
+            // Todo: Parse the header
+        }
+        $stream = $this->fopen("r");
+        while (!$stream->feof()) {
+            $row = $stream->freadcsv(0, $this->csvOptions["delimiter"], $this->csvOptions["enclosure"], $this->csvOptions["escape"]);
+            $ret = $callback($row);
+            if ($ret === false) {
+                $stream->fclose();
+                return false;
+            }
+        }
+        return true;
+    }
+
+
     public function rename ($newName) : self
     {
         if ( ! @rename($this->uri, $newName))
