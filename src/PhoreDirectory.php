@@ -24,10 +24,10 @@ class PhoreDirectory extends PhoreUri
 
     public function walk(callable $fn, string $filter=null) : bool
     {
-        $dir = opendir($this->path);
-        if (!$dir)
-            throw new FileAccessException("Cannot open path '$this' for indexing.");
-        while (($curSub = readdir($dir)) !== false) {
+        $dirFp = opendir($this->uri);
+        if (!$dirFp)
+            throw new FileAccessException("Cannot open path '{$this->uri}' for indexing.");
+        while (($curSub = readdir($dirFp)) !== false) {
             if ($curSub == "." || $curSub == "..")
                 continue;
 
@@ -37,17 +37,17 @@ class PhoreDirectory extends PhoreUri
                 }
             }
 
-            $path = $this->withSubPath($dir);
+            $path = $this->withSubPath($curSub);
             if ($path->isFile())
                 $path = $path->asFile();
 
             $ret = $fn($path);
             if ($ret === false) {
-                closedir($dir);
+                closedir($dirFp);
                 return false;
             }
         }
-        closedir($dir);
+        closedir($dirFp);
         return true;
     }
 
@@ -72,7 +72,7 @@ class PhoreDirectory extends PhoreUri
         $this->walk(function(PhoreUri $uri) use (&$ret) {
             $ret[] = $uri;
         }, $filter);
-        sort($ret, function (PhoreUri $a, PhoreUri $b) {
+        usort($ret, function (PhoreUri $a, PhoreUri $b) {
             if ((string)$a == (string)$b)
                 return 0;
             return ((string)$a < (string)$b) ? -1 : 1;

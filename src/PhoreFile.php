@@ -153,13 +153,7 @@ class PhoreFile extends PhoreUri
     }
 
 
-    private $csvOptions = [
-        "parseHeader" => false,
-        "delimiter" => ",",
-        "enclosure" => '"',
-        "escape" => "\\",
-        "headerMap" => null
-    ];
+    private $csvOptions = null;
 
     public function withCsvOptions(bool $parseHeader=false, string $delimiter=",", string $enclosure='"', string $escape="\\") : self
     {
@@ -176,12 +170,16 @@ class PhoreFile extends PhoreUri
 
     public function walkCSV (callable $callback) : bool
     {
+        if ($this->csvOptions === null)
+            throw new \InvalidArgumentException("Unset csv options. Call withCsvOptions() before!");
         if ($this->csvOptions["parseHeader"] === true) {
             // Todo: Parse the header
         }
         $stream = $this->fopen("r");
         while (!$stream->feof()) {
             $row = $stream->freadcsv(0, $this->csvOptions["delimiter"], $this->csvOptions["enclosure"], $this->csvOptions["escape"]);
+            if ($row === null)
+                continue;
             $ret = $callback($row);
             if ($ret === false) {
                 $stream->fclose();

@@ -48,9 +48,14 @@ class FileStream
             throw new FileAccessException("Cannot get fgets('$this->file'): " . error_get_last()["message"]);
         return $data;
     }
-    public function freadcsv (int $length=0, string $delimiter=",", string $enclosure='"', string $escape_char = "\\") : array {
-        if (false === ($data = @fgetcsv($this->res, $length, $delimiter, $enclosure, $escape_char)) && ! @feof($this->res))
+
+    public function freadcsv (int $length=0, string $delimiter=",", string $enclosure='"', string $escape_char = "\\")
+    {
+        $data = fgetcsv($this->res, $length, $delimiter, $enclosure, $escape_char);
+        if (null === $data)
             throw new FileAccessException("Cannot get fgetcsv('$this->file'): " . error_get_last()["message"]);
+        if ($data === false)
+            return null;
         return $data;
     }
     public function fputcsv (array $fields, string $delimiter=",", string $enclosure='"', string $escape_char = "\\") : self {
