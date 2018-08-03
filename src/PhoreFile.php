@@ -55,10 +55,6 @@ class PhoreFile extends PhoreUri
     public function get_contents()
     {
         try {
-            if (func_num_args() > 0) {
-
-                return $this;
-            }
             return $this->_read_content_locked();
         } catch (\Exception $e) {
             throw new $e($e->getMessage(), $e->getCode(), $e);
