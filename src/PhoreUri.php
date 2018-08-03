@@ -31,6 +31,12 @@ class PhoreUri
     }
 
 
+    public function getBasename() : string
+    {
+        return basename($this->uri);
+    }
+
+
     public function withDirName() : PhoreDirectory
     {
         return new PhoreDirectory(dirname($this->uri));
