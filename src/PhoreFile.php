@@ -176,11 +176,12 @@ class PhoreFile extends PhoreUri
             // Todo: Parse the header
         }
         $stream = $this->fopen("r");
+        $index = 0;
         while (!$stream->feof()) {
             $row = $stream->freadcsv(0, $this->csvOptions["delimiter"], $this->csvOptions["enclosure"], $this->csvOptions["escape"]);
             if ($row === null)
                 continue;
-            $ret = $callback($row);
+            $ret = $callback($row, $index++);
             if ($ret === false) {
                 $stream->fclose();
                 return false;
