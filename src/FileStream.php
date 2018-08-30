@@ -21,6 +21,12 @@ class FileStream
     protected $filename;
     
     
+    public function __construct(string $filename, sting $mode)
+    {
+        $this->fopen($filename, $mode);
+    }
+
+
     public function fopen (string $filename, $mode) : self
     {
         $this->filename = $filename;
