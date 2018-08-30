@@ -12,27 +12,15 @@ namespace Phore\FileSystem;
 use Phore\FileSystem\Exception\FileAccessException;
 
 
-class FileStream
+class GzFileStream extends FileStream
 {
-    protected $res;
-    /**
-     * @var PhoreFile
-     */
-    protected $file;
-    public function __construct($res=null, PhoreFile $file)
-    {
-        $this->res = $res;
-        $this->file = $file;
-    }
-    
     public function fopen ($mode) : self
     {
-        $this->res = fopen($this->file, $mode);
+        $this->res = gzopen($this->file, $mode);
         if ( ! $this->res)
             throw new FileAccessException("fopen($this->file): " . error_get_last()["message"]);
         return $this;
     }
-    
     public function flock(int $operation) : self {
         if ( ! @flock($this->res, $operation)) {
             throw new FileAccessException("Cannot flock('$this->file'): " . error_get_last()["message"]);
@@ -40,27 +28,27 @@ class FileStream
         return $this;
     }
     public function feof() : bool {
-        return @feof($this->res);
+        return @gzeof($this->res);
     }
     public function fwrite ($data) : self {
-        if (false === @fwrite($this->res, $data))
-            throw new FileAccessException("Cannot get fwrite('$this->file'): " . error_get_last()["message"]);
+        if (false === @gzwrite($this->res, $data))
+            throw new FileAccessException("Cannot get gzwrite('$this->file'): " . error_get_last()["message"]);
         return $this;
     }
     public function fread (int $length) : string {
-        if (false === ($data = @fread($this->res, $length)))
+        if (false === ($data = @gzread($this->res, $length)))
             throw new FileAccessException("Cannot get fread('$this->file'): " . error_get_last()["message"]);
         return $data;
     }
     public function fgets (int $length=null) {
-        if (false === ($data = @fgets($this->res, $length)) && ! @feof($this->res))
+        if (false === ($data = @gzgets($this->res, $length)) && ! @feof($this->res))
             throw new FileAccessException("Cannot get fgets('$this->file'): " . error_get_last()["message"]);
         return $data;
     }
 
     public function freadcsv (int $length=0, string $delimiter=",", string $enclosure='"', string $escape_char = "\\")
     {
-        $data = fgetcsv($this->res, $length, $delimiter, $enclosure, $escape_char);
+        $data = str_getcsv($this->fgets($length), $delimiter, $enclosure, $escape_char);
         if (null === $data)
             throw new FileAccessException("Cannot get fgetcsv('$this->file'): " . error_get_last()["message"]);
         if ($data === false)
@@ -73,14 +61,14 @@ class FileStream
         return $this;
     }
     public function fclose() : PhoreFile {
-        if (false === @fclose($this->res))
-            throw new FileAccessException("Cannot get fclose('$this->file'): " . error_get_last()["message"]);
+        if (false === @gzclose($this->res))
+            throw new FileAccessException("Cannot get gzclose('$this->file'): " . error_get_last()["message"]);
         return $this->file;
     }
 
     public function seek(int $offset) : self
     {
-        fseek($this->res, $offset);
+        gzseek($this->res, $offset);
         return $this;
     }
 

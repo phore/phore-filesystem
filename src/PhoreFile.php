@@ -19,10 +19,9 @@ class PhoreFile extends PhoreUri
 
     public function fopen(string $mode) : FileStream
     {
-        $fp = @fopen($this->uri, $mode);
-        if ( ! $fp)
-            throw new FileAccessException("fopen($this->uri): " . error_get_last()["message"]);
-        return new FileStream($fp, $this);
+        $stream = new FileStream(null, $mode);
+        $stream->fopen($mode);
+        return $stream;
     }
 
     private function _read_content_locked ()
