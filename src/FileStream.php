@@ -36,26 +36,31 @@ class FileStream
         return $this;
     }
     
-    public function flock(int $operation) : FileStream {
+    public function flock(int $operation) : FileStream 
+    {
         if ( ! @flock($this->res, $operation)) {
             throw new FileAccessException("Cannot flock('$this->filename'): " . error_get_last()["message"]);
         }
         return $this;
     }
-    public function feof() : bool {
+    public function feof() : bool 
+    {
         return @feof($this->res);
     }
-    public function fwrite ($data) : FileStream {
+    public function fwrite ($data) : FileStream 
+    {
         if (false === @fwrite($this->res, $data))
             throw new FileAccessException("Cannot get fwrite('$this->filename'): " . error_get_last()["message"]);
         return $this;
     }
-    public function fread (int $length) : string {
+    public function fread (int $length) : string 
+    {
         if (false === ($data = @fread($this->res, $length)))
             throw new FileAccessException("Cannot get fread('$this->filename'): " . error_get_last()["message"]);
         return $data;
     }
-    public function fgets (int $length=null) {
+    public function fgets (int $length=null) 
+    {
         if (false === ($data = @fgets($this->res, $length)) && ! @feof($this->res))
             throw new FileAccessException("Cannot get fgets('$this->filename'): " . error_get_last()["message"]);
         return $data;
@@ -70,15 +75,17 @@ class FileStream
             return null;
         return $data;
     }
-    public function fputcsv (array $fields, string $delimiter=",", string $enclosure='"', string $escape_char = "\\") : FileStream {
+    public function fputcsv (array $fields, string $delimiter=",", string $enclosure='"', string $escape_char = "\\") : FileStream 
+    {
         if (false === @fputcsv($this->res, $fields, $delimiter, $enclosure, $escape_char))
             throw new FileAccessException("Cannot get fgets('$this->filename'): " . error_get_last()["message"]);
         return $this;
     }
-    public function fclose() : PhoreFile {
+    public function fclose() : PhoreFile 
+    {
         if (false === @fclose($this->res))
             throw new FileAccessException("Cannot get fclose('$this->filename'): " . error_get_last()["message"]);
-        return $this->file;
+        return new PhoreFile($this->filename);
     }
 
     public function seek(int $offset) : FileStream
