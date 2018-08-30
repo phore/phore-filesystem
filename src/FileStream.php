@@ -21,13 +21,13 @@ class FileStream
     protected $filename;
     
     
-    public function __construct(string $filename, sting $mode)
+    public function __construct(string $filename, string $mode)
     {
         $this->fopen($filename, $mode);
     }
 
 
-    public function fopen (string $filename, $mode) : self
+    public function fopen (string $filename, string $mode) : FileStream
     {
         $this->filename = $filename;
         $this->res = fopen($filename, $mode);
@@ -36,7 +36,7 @@ class FileStream
         return $this;
     }
     
-    public function flock(int $operation) : self {
+    public function flock(int $operation) : FileStream {
         if ( ! @flock($this->res, $operation)) {
             throw new FileAccessException("Cannot flock('$this->filename'): " . error_get_last()["message"]);
         }
@@ -45,7 +45,7 @@ class FileStream
     public function feof() : bool {
         return @feof($this->res);
     }
-    public function fwrite ($data) : self {
+    public function fwrite ($data) : FileStream {
         if (false === @fwrite($this->res, $data))
             throw new FileAccessException("Cannot get fwrite('$this->filename'): " . error_get_last()["message"]);
         return $this;
@@ -70,7 +70,7 @@ class FileStream
             return null;
         return $data;
     }
-    public function fputcsv (array $fields, string $delimiter=",", string $enclosure='"', string $escape_char = "\\") : self {
+    public function fputcsv (array $fields, string $delimiter=",", string $enclosure='"', string $escape_char = "\\") : FileStream {
         if (false === @fputcsv($this->res, $fields, $delimiter, $enclosure, $escape_char))
             throw new FileAccessException("Cannot get fgets('$this->filename'): " . error_get_last()["message"]);
         return $this;
@@ -81,7 +81,7 @@ class FileStream
         return $this->file;
     }
 
-    public function seek(int $offset) : self
+    public function seek(int $offset) : FileStream
     {
         fseek($this->res, $offset);
         return $this;

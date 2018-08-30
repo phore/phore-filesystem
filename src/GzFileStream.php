@@ -14,7 +14,7 @@ use Phore\FileSystem\Exception\FileAccessException;
 
 class GzFileStream extends FileStream
 {
-    public function fopen (string $filename, $mode) : self
+    public function fopen (string $filename, string $mode) : FileStream
     {
         $this->filename = $filename;
         $this->res = gzopen($filename, $mode);
@@ -22,7 +22,7 @@ class GzFileStream extends FileStream
             throw new FileAccessException("fopen($this->filename): " . error_get_last()["message"]);
         return $this;
     }
-    public function flock(int $operation) : self {
+    public function flock(int $operation) : FileStream {
         if ( ! @flock($this->res, $operation)) {
             throw new FileAccessException("Cannot flock('$this->filename'): " . error_get_last()["message"]);
         }
@@ -31,7 +31,7 @@ class GzFileStream extends FileStream
     public function feof() : bool {
         return @gzeof($this->res);
     }
-    public function fwrite ($data) : self {
+    public function fwrite ($data) : FileStream {
         if (false === @gzwrite($this->res, $data))
             throw new FileAccessException("Cannot get gzwrite('$this->filename'): " . error_get_last()["message"]);
         return $this;
@@ -56,7 +56,7 @@ class GzFileStream extends FileStream
             return null;
         return $data;
     }
-    public function fputcsv (array $fields, string $delimiter=",", string $enclosure='"', string $escape_char = "\\") : self {
+    public function fputcsv (array $fields, string $delimiter=",", string $enclosure='"', string $escape_char = "\\") : FileStream {
         if (false === @fputcsv($this->res, $fields, $delimiter, $enclosure, $escape_char))
             throw new FileAccessException("Cannot get fgets('$this->filename'): " . error_get_last()["message"]);
         return $this;
@@ -67,7 +67,7 @@ class GzFileStream extends FileStream
         return $this->file;
     }
 
-    public function seek(int $offset) : self
+    public function seek(int $offset) : FileStream
     {
         gzseek($this->res, $offset);
         return $this;
