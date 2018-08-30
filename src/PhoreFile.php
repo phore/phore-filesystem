@@ -19,8 +19,8 @@ class PhoreFile extends PhoreUri
 
     public function fopen(string $mode) : FileStream
     {
-        $stream = new FileStream(null, $mode);
-        $stream->fopen($mode);
+        $stream = new FileStream();
+        $stream->fopen($this, $mode);
         return $stream;
     }
 
