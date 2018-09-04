@@ -10,6 +10,7 @@ namespace Phore\FileSystem;
 
 
 use Phore\FileSystem\Exception\FileAccessException;
+use Phore\FileSystem\Exception\FilesystemException;
 
 class PhoreDirectory extends PhoreUri
 {
@@ -19,6 +20,14 @@ class PhoreDirectory extends PhoreUri
     {
         if ( ! $this->isDirectory())
             mkdir($this->uri, $createMask, true);
+        return $this;
+    }
+
+
+    public function chown (string $owner) : self
+    {
+        if ( ! chown($this->uri, $owner))
+            throw new FilesystemException("Cannot chown $this->uri to user $owner");
         return $this;
     }
 

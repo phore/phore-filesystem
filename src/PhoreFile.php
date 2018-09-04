@@ -12,6 +12,7 @@ namespace Phore\FileSystem;
 use Phore\FileSystem\Exception\FileAccessException;
 use Phore\FileSystem\Exception\FileNotFoundException;
 use Phore\FileSystem\Exception\FileParsingException;
+use Phore\FileSystem\Exception\FilesystemException;
 use Phore\FileSystem\Exception\PathOutOfBoundsException;
 
 class PhoreFile extends PhoreUri
@@ -33,6 +34,8 @@ class PhoreFile extends PhoreUri
         $file->fclose();
         return $buf;
     }
+
+
 
     private function _write_content_locked ($content, bool $append = false)
     {
@@ -67,6 +70,14 @@ class PhoreFile extends PhoreUri
         } catch (\Exception $e) {
             throw new $e($e->getMessage(), $e->getCode(), $e);
         }
+        return $this;
+    }
+
+
+    public function chown (string $owner) : self
+    {
+        if ( ! chown($this->uri, $owner))
+            throw new FilesystemException("Cannot chown $this->uri to user $owner");
         return $this;
     }
 
