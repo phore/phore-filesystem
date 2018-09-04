@@ -139,6 +139,18 @@ class PhoreFile extends PhoreUri
      * @return $this|array
      * @throws FileParsingException
      */
+    public function set_json(array $data) : self
+    {
+        $this->set_contents(json_encode($data));
+        return $this;
+    }
+
+    /**
+     * @param null $content
+     *
+     * @return $this|array
+     * @throws FileParsingException
+     */
     public function get_serialized() : array
     {
         $serialize = unserialize($this->get_contents());
