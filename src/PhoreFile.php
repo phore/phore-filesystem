@@ -218,9 +218,12 @@ class PhoreFile extends PhoreUri
     public function touch($mode="0777") : self
     {
         if ( ! file_exists($this->uri)) {
-            mkdir(dirname($this->uri, $mode), true);
-            touch ($this->uri, $mode);
+            mkdir(dirname($this->uri),  $mode, true);
+            touch($this->uri);
+            chmod($this->uri, $mode);
         }
+        if ( ! is_file($this->uri))
+            throw new FilesystemException("touch file '$this->uri': Uri exists but is not a file.");
         return $this;
     }
 

@@ -24,7 +24,7 @@ class PhoreDirectory extends PhoreUri
     }
 
 
-    public function chown (string $owner) : self
+    public function chown ($owner) : self
     {
         if ( ! chown($this->uri, $owner))
             throw new FilesystemException("Cannot chown $this->uri to user $owner");
