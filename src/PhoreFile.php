@@ -211,6 +211,19 @@ class PhoreFile extends PhoreUri
         return true;
     }
 
+    /**
+     * @param string $mode
+     * @return PhoreFile
+     */
+    public function touch($mode="0777") : self
+    {
+        if ( ! file_exists($this->uri)) {
+            mkdir(dirname($this->uri, $mode), true);
+            touch ($this->uri, $mode);
+        }
+        return $this;
+    }
+
 
     public function getFilesize() : int
     {
