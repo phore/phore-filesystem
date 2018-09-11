@@ -23,6 +23,13 @@ class PhoreFile extends PhoreUri
         $stream = new FileStream($this, $mode);
         return $stream;
     }
+    
+    
+    public function gzopen(string $mode) : GzFileStream
+    {
+        $stream = new GzFileStream($this, $mode);
+        return $stream;
+    }
 
     private function _read_content_locked ()
     {
