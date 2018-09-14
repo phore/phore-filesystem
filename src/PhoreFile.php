@@ -18,6 +18,25 @@ use Phore\FileSystem\Exception\PathOutOfBoundsException;
 class PhoreFile extends PhoreUri
 {
 
+    private $unlinkOnClose = false;
+    
+    public function unlinkOnClose() : FileStream
+    {
+        $this->unlinkOnClose = true;
+        return $this;
+    }
+    
+    
+    public function __destruct()
+    {
+        if ($this->unlinkOnClose) {
+            if ($this->isFile())
+                $this->unlink();
+        }
+
+    }
+
+
     public function fopen(string $mode) : FileStream
     {
         $stream = new FileStream($this, $mode);
