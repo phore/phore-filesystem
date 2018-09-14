@@ -20,7 +20,7 @@ class PhoreFile extends PhoreUri
 
     private $unlinkOnClose = false;
     
-    public function unlinkOnClose() : FileStream
+    public function unlinkOnClose() : PhoreFile
     {
         $this->unlinkOnClose = true;
         return $this;
