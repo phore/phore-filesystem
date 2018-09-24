@@ -84,7 +84,7 @@ class PhoreFile extends PhoreUri
         try {
             return $this->_read_content_locked();
         } catch (\Exception $e) {
-            throw new $e($e->getMessage(), $e->getCode(), $e);
+            throw new FilesystemException($e->getMessage(), $e->getCode(), $e);
         }
     }
 
@@ -94,7 +94,7 @@ class PhoreFile extends PhoreUri
         try {
             $this->_write_content_locked($contents);
         } catch (\Exception $e) {
-            throw new $e($e->getMessage(), $e->getCode(), $e);
+            throw new FilesystemException($e->getMessage(), $e->getCode(), $e);
         }
         return $this;
     }
