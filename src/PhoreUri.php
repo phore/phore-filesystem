@@ -107,6 +107,11 @@ class PhoreUri
         return file_exists($this->uri) && is_file($this->uri);
     }
 
+    public function exists() : bool
+    {
+        return file_exists($this->uri);
+    }
+
 
     public function assertDirectory () : PhoreDirectory
     {

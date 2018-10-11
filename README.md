@@ -46,3 +46,12 @@ phore_uri("/tmp")->assertIsFile()->assertIsWritable();
 ```php
 phore_uri("/tmp/somefile.yml")->assertFile()->get_yaml();
 ```
+
+
+## Tempoary Files
+
+Will be unlinked when object destructs.
+
+```
+$file = new PhoreTempFile();
+```
