@@ -16,6 +16,11 @@ function phore_file(string $filename) : \Phore\FileSystem\PhoreFile
     return new \Phore\FileSystem\PhoreFile($filename);
 }
 
+function phore_tempfile() : \Phore\FileSystem\PhoreTempFile
+{
+    return new \Phore\FileSystem\PhoreTempFile();
+}
+
 function phore_dir(string $directory) : \Phore\FileSystem\PhoreDirectory
 {
     return new \Phore\FileSystem\PhoreDirectory($directory);
