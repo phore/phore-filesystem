@@ -16,16 +16,16 @@ class GzFileStream extends FileStream
 {
     public function fopen (string $filename, string $mode) : FileStream
     {
-        $this->filename = $filename;
+        $this->file = $filename;
         $this->res = gzopen($filename, $mode);
         if ( ! $this->res)
-            throw new FileAccessException("fopen($this->filename): " . error_get_last()["message"]);
+            throw new FileAccessException("fopen($this->file): " . error_get_last()["message"]);
         return $this;
     }
     public function flock(int $operation) : FileStream 
     {
         if ( ! @flock($this->res, $operation)) {
-            throw new FileAccessException("Cannot flock('$this->filename'): " . error_get_last()["message"]);
+            throw new FileAccessException("Cannot flock('$this->file'): " . error_get_last()["message"]);
         }
         return $this;
     }
@@ -36,19 +36,19 @@ class GzFileStream extends FileStream
     public function fwrite ($data) : FileStream 
     {
         if (false === @gzwrite($this->res, $data))
-            throw new FileAccessException("Cannot get gzwrite('$this->filename'): " . error_get_last()["message"]);
+            throw new FileAccessException("Cannot get gzwrite('$this->file'): " . error_get_last()["message"]);
         return $this;
     }
     public function fread (int $length) : string 
     {
         if (false === ($data = @gzread($this->res, $length)))
-            throw new FileAccessException("Cannot get fread('$this->filename'): " . error_get_last()["message"]);
+            throw new FileAccessException("Cannot get fread('$this->file'): " . error_get_last()["message"]);
         return $data;
     }
     public function fgets (int $length=null) 
     {
         if (false === ($data = @gzgets($this->res, $length)) && ! @feof($this->res))
-            throw new FileAccessException("Cannot get fgets('$this->filename'): " . error_get_last()["message"]);
+            throw new FileAccessException("Cannot get fgets('$this->file'): " . error_get_last()["message"]);
         return $data;
     }
 
@@ -56,7 +56,7 @@ class GzFileStream extends FileStream
     {
         $data = str_getcsv($this->fgets($length), $delimiter, $enclosure, $escape_char);
         if (null === $data)
-            throw new FileAccessException("Cannot get fgetcsv('$this->filename'): " . error_get_last()["message"]);
+            throw new FileAccessException("Cannot get fgetcsv('$this->file'): " . error_get_last()["message"]);
         if ($data === false)
             return null;
         return $data;
@@ -64,14 +64,14 @@ class GzFileStream extends FileStream
     public function fputcsv (array $fields, string $delimiter=",", string $enclosure='"', string $escape_char = "\\") : FileStream 
     {
         if (false === @fputcsv($this->res, $fields, $delimiter, $enclosure, $escape_char))
-            throw new FileAccessException("Cannot get fgets('$this->filename'): " . error_get_last()["message"]);
+            throw new FileAccessException("Cannot get fgets('$this->file'): " . error_get_last()["message"]);
         return $this;
     }
     public function fclose() : PhoreFile 
     {
         if (false === @gzclose($this->res))
-            throw new FileAccessException("Cannot get gzclose('$this->filename'): " . error_get_last()["message"]);
-        return new PhoreFile($this->filename);
+            throw new FileAccessException("Cannot get gzclose('$this->file'): " . error_get_last()["message"]);
+        return new PhoreFile($this->file);
     }
 
     public function seek(int $offset) : FileStream

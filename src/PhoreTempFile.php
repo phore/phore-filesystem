@@ -11,21 +11,19 @@ namespace Phore\FileSystem;
 
 use Phore\FileSystem\Exception\FilesystemException;
 
-class PhoreTempFile
+class PhoreTempFile extends PhoreFile
 {
-
-    private $name;
-    
+    /**
+     * PhoreTempFile constructor.
+     * @param string $prefix
+     * @throws FilesystemException
+     */
     public function __construct($prefix="")
     {
-        $this->name = tempnam(sys_get_temp_dir(), $prefix);
-        if ($this->name === false)
+        $name = tempnam(sys_get_temp_dir(), $prefix);
+        if ($name === false)
             throw new FilesystemException("Can't create new tempoary file.");
+        $this->unlinkOnClose();
+        parent::__construct(tempnam(sys_get_temp_dir(), $prefix));
     }
-    
-    public function __toString()
-    {
-        return $this->name;
-    }
-
 }
