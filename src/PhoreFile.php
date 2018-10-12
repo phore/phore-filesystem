@@ -119,6 +119,8 @@ class PhoreFile extends PhoreUri
             $this->_write_content_locked($appendContent, true);
             return $this;
         } catch (\Exception $e) {
+            if ($e instanceof \ErrorException)
+                throw new \Exception($e->getMessage(), $e->getCode(), $e);
             throw new $e($e->getMessage(), $e->getCode(), $e);
         }
     }
