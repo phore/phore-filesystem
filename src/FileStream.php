@@ -101,11 +101,7 @@ class FileStream implements StreamInterface
         return new PhoreFile($this->file);
     }
 
-    public function seek(int $offset) : FileStream
-    {
-        fseek($this->res, $offset);
-        return $this;
-    }
+
 
     public function getRessource()
     {
@@ -132,6 +128,12 @@ class FileStream implements StreamInterface
             $this->seek(0);
         return $this->getContents();
     }
+
+    public function seek($offset, $whence = SEEK_SET)
+    {
+        fseek($this->res, $offset, $whence);
+    }
+
 
     /**
      * Closes the stream and any underlying resources.
