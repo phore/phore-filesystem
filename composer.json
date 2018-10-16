@@ -19,7 +19,8 @@
   "require": {
     "php" : ">7.1",
     "ext-yaml": "*",
-    "ext-json": "*"
+    "ext-json": "*",
+    "psr/http-message": "^1.0@dev"
   },
   "require-dev": {
     "nette/tester": "*"
