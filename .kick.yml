@@ -1,7 +1,7 @@
 # Kickstart container config file - see https://gitub.com/c7lab/kickstart
 # Run ./kickstart.sh to start a development-container for this project
 version: 1
-from: "continue/kickstart-flavor-gaia"
+from: "infracamp/kickstart-flavor-gaia"
 
 apache_fallback_resource: "/index.php"
 
@@ -10,4 +10,4 @@ command:
     - "composer update"
 
   test:
-    - "tester -C test/php.ini test/"
+    - "phpunit tests/"

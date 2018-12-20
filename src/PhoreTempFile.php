@@ -24,6 +24,6 @@ class PhoreTempFile extends PhoreFile
         if ($name === false)
             throw new FilesystemException("Can't create new tempoary file.");
         $this->unlinkOnClose();
-        parent::__construct(tempnam(sys_get_temp_dir(), $prefix));
+        parent::__construct($name);
     }
 }

@@ -23,7 +23,7 @@
     "psr/http-message": "^1.0@dev"
   },
   "require-dev": {
-    "nette/tester": "*"
+    "phpunit/phpunit": "^8.0@dev"
   },
   "suggest": {
   },

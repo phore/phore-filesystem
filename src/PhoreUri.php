@@ -144,6 +144,12 @@ class PhoreUri
     }
 
 
+    public function getUri() : string
+    {
+        return $this->uri;
+    }
+
+
     public function __toString()
     {
         return $this->uri;
