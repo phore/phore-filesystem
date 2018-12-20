@@ -18,7 +18,7 @@ class PhoreDirectory extends PhoreUri
 
     public function mkdir($createMask=0777) : self
     {
-        if ( ! $this->isDirectory())
+        if ( ! is_dir($this->uri))
             mkdir($this->uri, $createMask, true);
         return $this;
     }
