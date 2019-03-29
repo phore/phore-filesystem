@@ -23,12 +23,16 @@ class FileStream implements StreamInterface
 
     /**
      * FileStream constructor.
-     * @param PhoreFile $file
+     * @param string|PhoreFile $file 
      * @param string $mode
      * @throws FileAccessException
      */
-    public function __construct(PhoreFile $file, string $mode)
+    public function __construct($file, string $mode)
     {
+        if (is_string($file))
+            $file = new PhoreFile($file);
+        if ( ! $file instanceof PhoreFile)
+            throw new \InvalidArgumentException("Parameter 1 must be filename (string) or PhoreFile");
         $this->file = $file;
         $this->fopen((string)$file, $mode);
     }
