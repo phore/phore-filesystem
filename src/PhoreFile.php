@@ -163,13 +163,13 @@ class PhoreFile extends PhoreUri
      */
     public function get_json() : array
     {
-        $json = json_decode($this->get_contents(), true);
-        if ($json === null) {
+        try {
+            return phore_json_decode($this->get_contents());
+        } catch (\InvalidArgumentException $e) {
             throw new FileParsingException(
-                "JSON Parsing of file '{$this->uri}' failed: " . json_last_error_msg()
+                "JSON Parsing of file '{$this->uri}' failed: " . $e->getMessage(), 0, $e
             );
         }
-        return $json;
     }
 
     /**
@@ -180,7 +180,7 @@ class PhoreFile extends PhoreUri
      */
     public function set_json(array $data) : self
     {
-        $this->set_contents(json_encode($data));
+        $this->set_contents(phore_json_encode($data));
         return $this;
     }
 
