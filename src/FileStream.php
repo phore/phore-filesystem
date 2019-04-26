@@ -98,6 +98,12 @@ class FileStream implements StreamInterface
             throw new FileAccessException("Cannot get fgets('$this->file'): " . error_get_last()["message"]);
         return $this;
     }
+    
+    public function isOpen() : bool 
+    {
+        return is_resource($this->res);
+    }
+    
     public function fclose() : PhoreFile 
     {
         if (false === @fclose($this->res))
