@@ -160,6 +160,17 @@ class PhoreUri
         return new PhoreFile($this->uri);
     }
 
+
+    public function withFileName(string $filename, string $fileExtension="") : PhoreFile
+    {
+        if ( ! ctype_alnum($fileExtension))
+            throw new \InvalidArgumentException("File extension '$fileExtension' must not contain special chars.");
+        if ($fileExtension !== "")
+            $fileExtension = "." . $fileExtension;
+        return new PhoreFile($this->uri . "/" . addslashes($filename) . $fileExtension);
+    }
+
+
     public function asDirectory() : PhoreDirectory
     {
         return new PhoreDirectory($this->uri);
