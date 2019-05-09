@@ -77,6 +77,7 @@ class PhoreFile extends PhoreUri
      * @param string|null $setContent
      *
      * @return PhoreFile|string
+     * @throws FileNotFoundException
      * @throws FileAccessException
      */
     public function get_contents()
@@ -84,6 +85,8 @@ class PhoreFile extends PhoreUri
         try {
             return $this->_read_content_locked();
         } catch (\Exception $e) {
+            if ( ! $this->exists())
+                throw new FileNotFoundException("File '$this->uri' not found.");
             throw new FilesystemException($e->getMessage(), $e->getCode(), $e);
         }
     }
@@ -134,6 +137,7 @@ class PhoreFile extends PhoreUri
      * @param null $content
      *
      * @return $this|array
+     * @throws FileNotFoundException
      * @throws \Exception
      */
     public function get_yaml() : array
@@ -159,6 +163,7 @@ class PhoreFile extends PhoreUri
      * @param null $content
      *
      * @return $this|array
+     * @throws FileNotFoundException
      * @throws FileParsingException
      */
     public function get_json() : array
@@ -196,6 +201,7 @@ class PhoreFile extends PhoreUri
      * @param null $content
      *
      * @return $this|array
+     * @throws FileNotFoundException
      * @throws FileParsingException
      */
     public function get_serialized() : array
