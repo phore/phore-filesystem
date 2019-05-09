@@ -184,6 +184,14 @@ class PhoreFile extends PhoreUri
         return $this;
     }
 
+    
+    public function set_yaml(array $data) : self
+    {
+        $this->set_contents(yaml_emit($data));
+        return $this;
+    }
+    
+    
     /**
      * @param null $content
      *
