@@ -31,9 +31,9 @@ class PhoreUri
     }
 
 
-    public function getBasename() : string
+    public function getBasename(string $suffix=null) : string
     {
-        return basename($this->uri);
+        return basename($this->uri, $suffix);
     }
 
 
