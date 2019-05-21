@@ -113,8 +113,11 @@ class PhoreUri
     }
 
 
-    public function assertDirectory () : PhoreDirectory
+    public function assertDirectory (bool $createIfNotExisting=false) : PhoreDirectory
     {
+        if ($createIfNotExisting === true && ! file_exists($this->uri)) {
+            mkdir($this->uri);
+        }
         if (file_exists($this->uri) && is_dir($this->uri))
             return new PhoreDirectory($this->uri);
         throw new FilesystemException("Uri '$this->uri' is not a valid directory.");
