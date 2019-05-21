@@ -25,17 +25,48 @@ class PhoreUri
     }
 
 
+    /**
+     * some/path/demo.inc.txt => some/path
+     *
+     * @return PhoreUri
+     */
     public function getDirname () : self
     {
         return new self(dirname($this->uri));
     }
 
 
+    /**
+     * demo.inc.txt => demo.inc.txt
+     *
+     * @param string|null $suffix
+     * @return string
+     */
     public function getBasename(string $suffix=null) : string
     {
         return basename($this->uri, $suffix);
     }
 
+    /**
+     * demo.inc.txt => txt
+     *
+     * @return string
+     */
+    public function getExtension() : string
+    {
+        return pathinfo($this->uri, PATHINFO_EXTENSION);
+    }
+
+    /**
+     *
+     * demo.inc.txt => demo.inc
+     *
+     * @return string
+     */
+    public function getFilename () : string
+    {
+        return pathinfo($this->uri, PATHINFO_FILENAME);
+    }
 
     public function withDirName() : PhoreDirectory
     {
