@@ -197,7 +197,7 @@ class PhoreUri
 
     public function withFileName(string $filename, string $fileExtension="") : PhoreFile
     {
-        if ( ! ctype_alnum($fileExtension))
+        if ($fileExtension !== "" && ! ctype_alnum($fileExtension))
             throw new \InvalidArgumentException("File extension '$fileExtension' must not contain special chars.");
         if ($fileExtension !== "")
             $fileExtension = "." . $fileExtension;
