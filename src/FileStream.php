@@ -78,8 +78,14 @@ class FileStream implements StreamInterface
     }
     public function fgets (int $length=null) 
     {
-        if (false === ($data = @fgets($this->res, $length)) && ! @feof($this->res))
-            throw new FileAccessException("Cannot get fgets('$this->file'): " . error_get_last()["message"]);
+        if ($length !== null) {
+            if (false === ($data = @fgets($this->res, $length)) && ! @feof($this->res))
+                throw new FileAccessException("Cannot get fgets('$this->file'): " . error_get_last()["message"]);
+        } else {
+            if (false === ($data = @fgets($this->res)) && ! @feof($this->res))
+                throw new FileAccessException("Cannot get fgets('$this->file'): " . error_get_last()["message"]);
+        }
+
         return $data;
     }
 
