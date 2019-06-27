@@ -147,14 +147,11 @@ class PhoreFile extends PhoreUri
         } catch (\Exception $e) {
             throw new $e($e->getMessage(), $e->getCode(), $e);
         }
-        ini_set("yaml.decode_php", "0");
-        $ret = yaml_parse($textData);
-        if ($ret === false) {
-            $err = error_get_last();
-            throw new FileParsingException(
-                "YAML Parsing of file '{$this->uri}' failed: {$err["message"]}",
-                0
-            );
+        try {
+
+            $ret = phore_yaml_decode($textData);
+        } catch (\InvalidArgumentException $e) {
+            throw new FileParsingException($e->getMessage() . " in file '{$this->getUri()}'", 0, $e);
         }
         return $ret;
     }
