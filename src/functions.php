@@ -6,13 +6,17 @@
  * Time: 15:16
  */
 
-function phore_uri(string $uri) : \Phore\FileSystem\PhoreUri
+function phore_uri($uri) : \Phore\FileSystem\PhoreUri
 {
+    if ($uri instanceof \Phore\FileSystem\PhoreUri)
+        return $uri;
     return new \Phore\FileSystem\PhoreUri($uri);
 }
 
-function phore_file(string $filename) : \Phore\FileSystem\PhoreFile
+function phore_file($filename) : \Phore\FileSystem\PhoreFile
 {
+    if ($filename instanceof \Phore\FileSystem\PhoreFile)
+        return $filename;
     return new \Phore\FileSystem\PhoreFile($filename);
 }
 
@@ -21,7 +25,9 @@ function phore_tempfile() : \Phore\FileSystem\PhoreTempFile
     return new \Phore\FileSystem\PhoreTempFile();
 }
 
-function phore_dir(string $directory) : \Phore\FileSystem\PhoreDirectory
+function phore_dir($directory) : \Phore\FileSystem\PhoreDirectory
 {
+    if ($directory instanceof \Phore\FileSystem\PhoreDirectory)
+        return $directory;
     return new \Phore\FileSystem\PhoreDirectory($directory);
 }
