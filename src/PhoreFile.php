@@ -195,21 +195,33 @@ class PhoreFile extends PhoreUri
     
     
     /**
-     * @param null $content
+     * @param $allowedClasses bool|string[]
      *
+     * @see phore_unserialize()
      * @return $this|array
      * @throws FileNotFoundException
      * @throws FileParsingException
      */
-    public function get_serialized() : array
+    public function get_serialized($allowedClasses=false) : array
     {
-        $serialize = unserialize($this->get_contents());
+        $serialize = phore_unserialize($this->get_contents(), $allowedClasses);
         if ($serialize === null) {
             throw new FileParsingException(
                 "Unserialize of file '{$this->uri}' failed."
             );
         }
         return $serialize;
+    }
+
+    /**
+     * @param $data
+     * @return PhoreFile
+     * @throws FilesystemException
+     */
+    public function set_serialized($data) : self
+    {
+        $this->set_contents(serialize($data));
+        return $this;
     }
 
 
