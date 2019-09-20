@@ -220,7 +220,7 @@ class PhoreFile extends PhoreUri
      */
     public function set_serialized($data) : self
     {
-        $this->set_contents(serialize($data));
+        $this->set_contents(phore_serialize($data));
         return $this;
     }
 
