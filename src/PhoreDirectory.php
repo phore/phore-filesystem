@@ -73,6 +73,37 @@ class PhoreDirectory extends PhoreUri
 
 
     /**
+     * @param string|null $filter
+     * @return \Iterator|PhoreUri[]
+     * @throws Exception\PathOutOfBoundsException
+     * @throws FileAccessException
+     */
+    public function genWalk(string $filter = null) : \Iterator
+    {
+        $dirFp = opendir($this->uri);
+        if (!$dirFp)
+            throw new FileAccessException("Cannot open path '{$this->uri}' for indexing.");
+        while (($curSub = readdir($dirFp)) !== false) {
+            if ($curSub == "." || $curSub == "..")
+                continue;
+
+            if ($filter !== null) {
+                if ( ! fnmatch($filter, $curSub)) {
+                    continue;
+                }
+            }
+
+            $path = $this->withSubPath($curSub);
+            if ($path->isFile())
+                $path = $path->asFile();
+            yield $path;
+        }
+        closedir($dirFp);
+    }
+
+
+
+    /**
      * @return PhoreUri[]
      * @throws FileAccessException
      */
