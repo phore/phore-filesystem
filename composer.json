@@ -2,6 +2,7 @@
   "name": "phore/filesystem",
   "type": "library",
   "description": "Acces files layer",
+  "homepage": "http://infracamp.org/project/phore",
   "license": "MIT",
   "authors": [
     {
