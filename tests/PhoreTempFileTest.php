@@ -37,5 +37,12 @@ class PhoreTempFileTest extends TestCase
         $this->assertEquals("89", $tmp->tail(2));
 
     }
+    public function testTailWithSmallInput()
+    {
+        $tmp = new PhoreTempFile();
+        $tmp->set_contents("123");
 
+        $this->assertEquals("123", $tmp->tail(6));
+
+    }
 }

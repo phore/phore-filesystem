@@ -104,10 +104,9 @@ class PhoreFile extends PhoreUri
         $stream = $this->fopen("r");
         if ( $this->fileSize() > $bytes)
             $stream->seek($this->fileSize() - $bytes);
-        $buf = "";
-        while ( ! $stream->feof()) {
-            $buf .= $stream->fread($bytes);
-        }
+
+        $buf = $stream->fread($bytes);
+
         $stream->close();
         return $buf;
     }
