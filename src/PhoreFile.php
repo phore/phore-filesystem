@@ -92,6 +92,27 @@ class PhoreFile extends PhoreUri
     }
 
 
+    /**
+     * Return the last x bytes of the file
+     *
+     * @param int $bytes
+     * @return string
+     * @throws FileAccessException
+     */
+    public function tail(int $bytes)
+    {
+        $stream = $this->fopen("r");
+        $stream->seek($this->getFilesize() - $bytes);
+        $buf = "";
+        while ( ! $stream->feof()) {
+            $buf .= $stream->fread(8000);
+        }
+        $stream->close();
+        return $buf;
+    }
+
+
+
     public function set_contents (string $contents) : self
     {
         try {

@@ -28,4 +28,14 @@ class PhoreTempFileTest extends TestCase
        $this->assertEquals(false, file_exists($name));
     }
 
+
+    public function testTail()
+    {
+        $tmp = new PhoreTempFile();
+        $tmp->set_contents("123456789");
+
+        $this->assertEquals("89", $tmp->tail(2));
+
+    }
+
 }
