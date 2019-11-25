@@ -157,7 +157,8 @@ class FileStream implements StreamInterface
      */
     public function truncate (int $size)
     {
-        ftruncate($this->res, $size);
+        if ( ! ftruncate($this->res, $size))
+            throw new \Exception("Cannot truncate() file to $size: " .  error_get_last()["message"]);
     }
 
     /**
