@@ -118,7 +118,7 @@ class PhoreFile extends PhoreUri
      * @param int $chunkSize
      * @throws FileAccessException
      */
-    public function passthru(callable $callback = null, int $chunkSize=16000)
+    public function passthru(callable $callback = null, int $chunkSize=64000)
     {
         $stream = $this->fopen("r");
         while ( ! $stream->feof()) {
