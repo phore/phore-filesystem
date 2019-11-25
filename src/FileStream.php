@@ -150,6 +150,16 @@ class FileStream implements StreamInterface
         fseek($this->res, $offset, $whence);
     }
 
+    /**
+     * Truncate the file to $size bytes
+     *
+     * @param int $size
+     */
+    public function truncate (int $size)
+    {
+        ftruncate($this->res, $size);
+    }
+
 
     /**
      * Closes the stream and any underlying resources.
