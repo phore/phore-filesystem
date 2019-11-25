@@ -160,6 +160,25 @@ class FileStream implements StreamInterface
         ftruncate($this->res, $size);
     }
 
+    /**
+     * Output the file directly to echo or a callback function if specified.
+     *
+     * @param callable|null $callback
+     * @param int $chunkSize
+     * @throws FileAccessException
+     */
+    public function passthru(callable $callback = null, int $chunkSize=64000)
+    {
+        while ( ! feof($this->res)) {
+            $buf = fread($this->res, $chunkSize);
+            if ($callback !== null) {
+                $callback($buf);
+            } else {
+                echo $buf;
+            }
+        }
+    }
+
 
     /**
      * Closes the stream and any underlying resources.

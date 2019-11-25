@@ -111,26 +111,7 @@ class PhoreFile extends PhoreUri
         return $buf;
     }
 
-    /**
-     * Output the file directly to echo or a callback function if specified.
-     *
-     * @param callable|null $callback
-     * @param int $chunkSize
-     * @throws FileAccessException
-     */
-    public function passthru(callable $callback = null, int $chunkSize=64000)
-    {
-        $stream = $this->fopen("r");
-        while ( ! $stream->feof()) {
-            $buf = $stream->fread($chunkSize);
-            if ($callback !== null) {
-                $callback($buf);
-            } else {
-                echo $buf;
-            }
-        }
 
-    }
 
 
     public function set_contents (string $contents) : self
