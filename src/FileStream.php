@@ -168,7 +168,7 @@ class FileStream implements StreamInterface
      * @param int $chunkSize
      * @throws FileAccessException
      */
-    public function passthru(callable $callback = null, int $chunkSize=64000)
+    public function passthru(callable $callback = null, int $chunkSize=128000)
     {
         while ( ! feof($this->res)) {
             $buf = fread($this->res, $chunkSize);
