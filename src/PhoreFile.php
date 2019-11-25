@@ -102,10 +102,11 @@ class PhoreFile extends PhoreUri
     public function tail(int $bytes)
     {
         $stream = $this->fopen("r");
-        $stream->seek($this->getFilesize() - $bytes);
+        if ( $this->fileSize() > $bytes)
+            $stream->seek($this->fileSize() - $bytes);
         $buf = "";
         while ( ! $stream->feof()) {
-            $buf .= $stream->fread(8000);
+            $buf .= $stream->fread($bytes);
         }
         $stream->close();
         return $buf;
