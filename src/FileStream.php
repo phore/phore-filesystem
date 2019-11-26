@@ -60,22 +60,26 @@ class FileStream implements StreamInterface
         }
         return $this;
     }
+
     public function feof() : bool 
     {
         return @feof($this->res);
     }
+
     public function fwrite ($data, &$bytesWritten=null) : FileStream
     {
         if (false === ($bytesWritten = @fwrite($this->res, $data)))
             throw new FileAccessException("Cannot get fwrite('$this->file'): " . error_get_last()["message"]);
         return $this;
     }
+
     public function fread (int $length) : string 
     {
         if (false === ($data = @fread($this->res, $length)))
             throw new FileAccessException("Cannot get fread('$this->file'): " . error_get_last()["message"]);
         return $data;
     }
+
     public function fgets (int $length=null) 
     {
         if ($length !== null) {
@@ -98,6 +102,7 @@ class FileStream implements StreamInterface
             return null;
         return $data;
     }
+
     public function fputcsv (array $fields, string $delimiter=",", string $enclosure='"', string $escape_char = "\\") : FileStream 
     {
         if (false === @fputcsv($this->res, $fields, $delimiter, $enclosure, $escape_char))
@@ -148,6 +153,13 @@ class FileStream implements StreamInterface
     public function seek($offset, $whence = SEEK_SET)
     {
         fseek($this->res, $offset, $whence);
+    }
+
+
+
+    public function fstat()
+    {
+        return fstat($this->res);
     }
 
     /**
@@ -210,7 +222,7 @@ class FileStream implements StreamInterface
      */
     public function getSize()
     {
-        return null;
+        return $this->fstat()["size"];
     }
 
     /**

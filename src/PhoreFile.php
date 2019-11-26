@@ -30,8 +30,9 @@ class PhoreFile extends PhoreUri
     public function __destruct()
     {
         if ($this->unlinkOnClose) {
-            if ($this->isFile())
+            if ($this->isFile()) {
                 $this->unlink();
+            }
         }
 
     }
@@ -102,8 +103,11 @@ class PhoreFile extends PhoreUri
     public function tail(int $bytes)
     {
         $stream = $this->fopen("r");
-        if ( $this->fileSize() > $bytes)
-            $stream->seek($this->fileSize() - $bytes);
+
+        // Use actual size from fstat - Important: fstat() won't rely on statcache
+        $size = $stream->getSize();
+        if ($size > $bytes)
+            $stream->seek($size - $bytes);
 
         $buf = $stream->fread($bytes);
 

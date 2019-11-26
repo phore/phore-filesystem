@@ -45,4 +45,18 @@ class PhoreTempFileTest extends TestCase
         $this->assertEquals("123", $tmp->tail(6));
 
     }
+
+
+    public function testTailWorksWithoutFstatCaching()
+    {
+
+        $tmp = new PhoreTempFile();
+        $tmp->touch();
+        $tmp->set_contents("abcdefg");
+
+        $this->assertEquals("fg", $tmp->tail(2));
+
+    }
+
+
 }
