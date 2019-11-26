@@ -154,6 +154,15 @@ class PhoreFile extends PhoreUri
         }
     }
 
+    /**
+     * Get the current fileSize
+     *
+     * Warning: fileSize might be cached in statcache. For uncached
+     * result use $file->fopen("r")->getSize()
+     *
+     *
+     * @return int
+     */
     public function fileSize () : int
     {
         return filesize($this->uri);
