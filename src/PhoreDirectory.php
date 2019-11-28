@@ -36,6 +36,9 @@ class PhoreDirectory extends PhoreUri
 
     public function rmDir($recursive=false) : self
     {
+        if ( ! is_dir($this->uri))
+            return $this;
+        
         if ($recursive === true) {
             $this->_rmDirRecursive((string)$this);
         } else {
