@@ -116,6 +116,17 @@ class PhoreFile extends PhoreUri
     }
 
 
+    /**
+     * Create the full directory if not existing
+     * 
+     * @return PhoreFile
+     */
+    public function createPath(int $createMask=0777) : self
+    {
+        phore_dir($this->getDirname())->mkdir($createMask);
+        return $this;
+    }
+    
 
 
     public function set_contents (string $contents) : self
