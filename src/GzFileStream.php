@@ -33,7 +33,7 @@ class GzFileStream extends FileStream
     {
         return @gzeof($this->res);
     }
-    public function fwrite ($data) : FileStream 
+    public function fwrite ($data, &$bytesWritten=null) : FileStream 
     {
         if (false === @gzwrite($this->res, $data))
             throw new FileAccessException("Cannot get gzwrite('$this->file'): " . error_get_last()["message"]);
@@ -74,10 +74,9 @@ class GzFileStream extends FileStream
         return new PhoreFile($this->file);
     }
 
-    public function seek(int $offset) : FileStream
+    public function seek($offset, $whence = SEEK_SET) 
     {
         gzseek($this->res, $offset);
-        return $this;
     }
 
     public function getRessource()
