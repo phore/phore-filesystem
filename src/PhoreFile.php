@@ -98,13 +98,15 @@ class PhoreFile extends PhoreUri
      *
      * @param PhoreFile $target
      */
-    public function streamCopyTo($targetFile, int $maxlen=null, int $offset=null)
+    public function streamCopyTo($destinationFile, int $maxlen=null)
     {
-        $targetFile = phore_file($targetFile);
-        $targetStream = $targetFile->fopen("w+");
+        $destinationFile = phore_file($destinationFile);
+        $targetStream = $destinationFile->fopen("w+");
 
         $sourceStream = $this->fopen("r");
-        stream_copy_to_stream($sourceStream->getRessource(), $targetStream->getRessource(), $maxlen, $offset);
+        while ( ! $sourceStream->feof()) {
+            $targetStream->fwrite($sourceStream->fread(8012));
+        }
 
         $sourceStream->fclose();
         $targetStream->fclose();
