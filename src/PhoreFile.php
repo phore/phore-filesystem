@@ -94,6 +94,26 @@ class PhoreFile extends PhoreUri
 
 
     /**
+     * Copy on file streaming to the other
+     *
+     * @param PhoreFile $target
+     */
+    public function streamCopyTo($targetFile, int $maxlen=null, int $offset=null)
+    {
+        $targetFile = phore_file($targetFile);
+        $targetStream = $targetFile->fopen("w+");
+
+        $sourceStream = $this->fopen("r");
+        stream_copy_to_stream($sourceStream->getRessource(), $targetStream->getRessource(), $maxlen, $offset);
+
+        $sourceStream->fclose();
+        $targetStream->fclose();
+
+    }
+
+
+
+    /**
      * Return the last x bytes of the file
      *
      * @param int $bytes
