@@ -23,7 +23,7 @@
     "ext-yaml": "*",
     "ext-json": "*",
     "psr/http-message": "^1.0@dev",
-    "phore/core": "dev-master"
+    "phore/core": "*"
   },
   "require-dev": {
     "phpunit/phpunit": "^8.0@dev"
