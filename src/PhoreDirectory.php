@@ -23,6 +23,30 @@ class PhoreDirectory extends PhoreUri
         return $this;
     }
 
+    private function _rmDirRecursive(string $dir)
+    {
+        if ( ! is_dir($dir))
+            return false;
+        $files = array_diff(scandir($dir), array('.','..'));
+        foreach ($files as $file) {
+            (is_dir("$dir/$file")) ? $this->_rmDirRecursive("$dir/$file") : unlink("$dir/$file");
+        }
+        return rmdir($dir);
+    }
+
+    public function rmDir($recursive=false) : self
+    {
+        if ( ! is_dir($this->uri))
+            return $this;
+        
+        if ($recursive === true) {
+            $this->_rmDirRecursive((string)$this);
+        } else {
+            if ( ! rmdir((string)$this))
+                throw new FilesystemException("Cannot rmdir $this->uri"); 
+        }
+        return $this;
+    }
 
     public function chown ($owner) : self
     {

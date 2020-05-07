@@ -1,4 +1,8 @@
 # phore-filesystem
+
+[![Actions Status](https://github.com/phore/phore-filesystem/workflows/tests/badge.svg)](https://github.com/phore/phore-filesystem/actions)
+
+
 File access functions
 
 

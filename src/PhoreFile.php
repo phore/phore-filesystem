@@ -94,6 +94,28 @@ class PhoreFile extends PhoreUri
 
 
     /**
+     * Copy on file streaming to the other
+     *
+     * @param PhoreFile $target
+     */
+    public function streamCopyTo($destinationFile, int $maxlen=null)
+    {
+        $destinationFile = phore_file($destinationFile);
+        $targetStream = $destinationFile->fopen("w+");
+
+        $sourceStream = $this->fopen("r");
+        while ( ! $sourceStream->feof()) {
+            $targetStream->fwrite($sourceStream->fread(8012));
+        }
+
+        $sourceStream->fclose();
+        $targetStream->fclose();
+
+    }
+
+
+
+    /**
      * Return the last x bytes of the file
      *
      * @param int $bytes
@@ -116,6 +138,17 @@ class PhoreFile extends PhoreUri
     }
 
 
+    /**
+     * Create the full directory if not existing
+     * 
+     * @return PhoreFile
+     */
+    public function createPath(int $createMask=0777) : self
+    {
+        phore_dir($this->getDirname())->mkdir($createMask);
+        return $this;
+    }
+    
 
 
     public function set_contents (string $contents) : self
