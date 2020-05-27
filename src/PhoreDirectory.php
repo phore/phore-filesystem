@@ -160,19 +160,22 @@ class PhoreDirectory extends PhoreUri
      * Find a single file in the directory. Return the PhoreFile Object
      * if found, thorws FileNotFoundException if not.
      *
+     * If parameter 2 is specified, it will contain the machtes from preg_match()
+     * 
      * <example>
      * phore_dir("/tmp")->getFileByPattern("/^some[0-9]\.txt$/")->get_contents();
      * </example>
      *
      * @param string $regex
+     * @param array $matches
      * @return PhoreFile
      * @throws FileNotFoundException
      */
-    public function getFileByPattern(string $regex) : PhoreFile
+    public function getFileByPattern(string $regex, &$matches = null) : PhoreFile
     {
         $found = null;
-        $this->walkR(function (PhoreUri $uri) use ($regex, &$found) {
-            if (preg_match($regex, (string)$uri) && $uri->isFile()) {
+        $this->walkR(function (PhoreUri $uri) use ($regex, &$found, &$matches) {
+            if (preg_match($regex, (string)$uri, $matches) && $uri->isFile()) {
                 $found = $uri;
                 return false;
             }
