@@ -7,8 +7,11 @@ namespace Phore\FileSystem;
 class PhoreTempDir extends PhoreDirectory
 {
 
-    public function __construct()
+    private $autoremove;
+    
+    public function __construct(bool $autoremove = true)
     {
+        $this->autoremove = $autoremove;
         $uri = sys_get_temp_dir() . "/" . uniqid("ptd_");
         parent::__construct($uri);
         $this->mkdir();
@@ -19,7 +22,8 @@ class PhoreTempDir extends PhoreDirectory
 
     public function __destruct()
     {
-        $this->rmDir(true);
+        if ($this->autoremove)
+            $this->rmDir(true);
     }
 
 }

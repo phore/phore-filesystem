@@ -9,6 +9,7 @@
 namespace Phore\FileSystem;
 
 
+use Phore\Core\Exception\InvalidDataException;
 use Phore\FileSystem\Exception\FileAccessException;
 use Phore\FileSystem\Exception\FileNotFoundException;
 use Phore\FileSystem\Exception\FileParsingException;
@@ -19,14 +20,14 @@ class PhoreFile extends PhoreUri
 {
 
     private $unlinkOnClose = false;
-    
+
     public function unlinkOnClose() : PhoreFile
     {
         $this->unlinkOnClose = true;
         return $this;
     }
-    
-    
+
+
     public function __destruct()
     {
         if ($this->unlinkOnClose) {
@@ -43,8 +44,8 @@ class PhoreFile extends PhoreUri
         $stream = new FileStream($this, $mode);
         return $stream;
     }
-    
-    
+
+
     public function gzopen(string $mode) : GzFileStream
     {
         $stream = new GzFileStream($this, $mode);
@@ -140,7 +141,7 @@ class PhoreFile extends PhoreUri
 
     /**
      * Create the full directory if not existing
-     * 
+     *
      * @return PhoreFile
      */
     public function createPath(int $createMask=0777) : self
@@ -148,7 +149,7 @@ class PhoreFile extends PhoreUri
         phore_dir($this->getDirname())->mkdir($createMask);
         return $this;
     }
-    
+
 
 
     public function set_contents (string $contents) : self
@@ -254,14 +255,14 @@ class PhoreFile extends PhoreUri
         return $this;
     }
 
-    
+
     public function set_yaml(array $data) : self
     {
         $this->set_contents(yaml_emit($data));
         return $this;
     }
-    
-    
+
+
     /**
      * @param $allowedClasses bool|string[]
      *
@@ -308,6 +309,7 @@ class PhoreFile extends PhoreUri
         return $new;
     }
 
+
     public function walkCSV (callable $callback) : bool
     {
         if ($this->csvOptions === null)
@@ -329,6 +331,69 @@ class PhoreFile extends PhoreUri
         }
         return true;
     }
+
+
+    /**
+     * Parse CSV file
+     *
+     * <example>
+     * foreach (phore_file("some.csv")->parseCsv() as $data) {
+     *      echo $data["col1"] . " ; ". $data["col2"]
+     * }
+     * </example>
+     *
+     *
+     * @param array $options
+     * @return \Generator
+     * @throws FileAccessException
+     * @throws InvalidDataException
+     */
+    public function parseCsv (array $options = []) : \Generator
+    {
+        $o = array_merge([
+            "parseHeader" => true,
+            "delimiter" => ",",
+            "enclosure" => '"',
+            "escape_char" => "\\",
+            "skip_empty_lines" => true,
+            "skip_invalid" => false,
+            "bufSize" => 128000,
+            "headerMap" => null
+        ], $options);
+
+        $s = $this->fopen("r");
+
+        $line = 0;
+        if ($o["parseHeader"] === true) {
+            $line++;
+            $o["headerMap"] = $s->freadcsv($o["bufSize"], $o["delimiter"], $o["enclosure"], $o["escape_char"]);
+        }
+
+        while ( ! $s->feof()) {
+            $line++;
+            $row = $s->freadcsv($o["bufSize"], $o["delimiter"], $o["enclosure"], $o["escape_char"]);
+            if ( ! is_array($row))
+                continue;
+            if ($o["skip_empty_lines"] && count($row) === 0)
+                continue;
+            if ($o["headerMap"] === null) {
+                yield $row;
+                continue;
+            }
+            if (count ($row) !== count($o["headerMap"])) {
+                if ($o["skip_invalid"])
+                    continue;
+                throw new InvalidDataException("Invalid csv data in '$this' on line $line: Expected " . count($o["headerMap"]) . " columns: '" . implode($o["delimiter"], $row) . "'");
+            }
+
+            $ret = [];
+            foreach ($row as $idx => $val)
+                $ret[$o["headerMap"][$idx]] = $val;
+            yield $ret;
+        }
+        $s->fclose();
+    }
+
 
     /**
      * @param string $mode
