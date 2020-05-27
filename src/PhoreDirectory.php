@@ -10,6 +10,7 @@ namespace Phore\FileSystem;
 
 
 use Phore\FileSystem\Exception\FileAccessException;
+use Phore\FileSystem\Exception\FileNotFoundException;
 use Phore\FileSystem\Exception\FilesystemException;
 
 class PhoreDirectory extends PhoreUri
@@ -38,12 +39,12 @@ class PhoreDirectory extends PhoreUri
     {
         if ( ! is_dir($this->uri))
             return $this;
-        
+
         if ($recursive === true) {
             $this->_rmDirRecursive((string)$this);
         } else {
             if ( ! rmdir((string)$this))
-                throw new FilesystemException("Cannot rmdir $this->uri"); 
+                throw new FilesystemException("Cannot rmdir $this->uri");
         }
         return $this;
     }
@@ -154,5 +155,31 @@ class PhoreDirectory extends PhoreUri
     {
         phore_exec("unzip :zipfile -d :folder", ["zipfile" => $filename, "folder" => (string)$this]);
     }
-    
+
+    /**
+     * Find a single file in the directory. Return the PhoreFile Object
+     * if found, thorws FileNotFoundException if not.
+     *
+     * <example>
+     * phore_dir("/tmp")->getFileByPattern("/^some[0-9]\.txt$/")->get_contents();
+     * </example>
+     *
+     * @param string $regex
+     * @return PhoreFile
+     * @throws FileNotFoundException
+     */
+    public function getFileByPattern(string $regex) : PhoreFile
+    {
+        $found = null;
+        $this->walkR(function (PhoreUri $uri) use ($regex, &$found) {
+            if (preg_match($regex, (string)$uri) && $uri->isFile()) {
+                $found = $uri;
+                return false;
+            }
+        });
+        if ($found === null)
+            throw new FileNotFoundException("No file matching pattern '$regex' found in directory '$this'");
+        return $found->asFile();
+    }
+
 }
