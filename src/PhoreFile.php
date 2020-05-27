@@ -394,6 +394,30 @@ class PhoreFile extends PhoreUri
         $s->fclose();
     }
 
+    /**
+     * Create a new tempoary file with the gunziped
+     * contents.
+     *
+     * <example>
+     *  phore_file("file.gz")->gunzip()->get_contents();
+     * </example>
+     *
+     * @return PhoreTempFile
+     */
+    public function gunzip () : PhoreTempFile
+    {
+        $tmp = phore_tempfile();
+        $tmpWriter = $tmp->fopen("w+");
+        $inFileStream = $this->gzopen("r");
+
+        while ( ! $inFileStream->feof()) {
+            $tmpWriter->fwrite($inFileStream->fread(8012));
+        }
+        $tmpWriter->fclose();
+        $inFileStream->fclose();
+        return $tmp;
+    }
+
 
     /**
      * @param string $mode
