@@ -264,6 +264,36 @@ class PhoreFile extends PhoreUri
 
 
     /**
+     * Dump all data in array to csv file. (Very slow!)
+     *
+     * @param array $data
+     * @return $this
+     * @throws FileAccessException
+     */
+    public function set_csv(array $data) : self
+    {
+        $keys = [];
+        foreach ($data as $val) {
+            foreach ($val as $key => $val)
+                $keys[$key] = true;
+        }
+        $keys = array_keys($keys);
+
+        $s = $this->fopen("w");
+        $s->fputcsv($keys);
+        foreach ($data as $row) {
+            $cur = [];
+            foreach ($keys as $key) {
+                $cur[] = isset($row[$key]) ? $row[$key] : "";
+            }
+            $s->fputcsv($cur);
+        }
+        $s->fclose();
+        return $this;
+    }
+
+
+    /**
      * @param $allowedClasses bool|string[]
      *
      * @see phore_unserialize()
