@@ -374,7 +374,7 @@ class PhoreFile extends PhoreUri
             $row = $s->freadcsv($o["bufSize"], $o["delimiter"], $o["enclosure"], $o["escape_char"]);
             if ( ! is_array($row))
                 continue;
-            if ($o["skip_empty_lines"] && count($row) === 0)
+            if ($o["skip_empty_lines"] && count($row) === 1 && empty($row[0]))
                 continue;
             if ($o["headerMap"] === null) {
                 yield $row;
