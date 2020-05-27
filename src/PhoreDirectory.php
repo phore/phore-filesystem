@@ -145,4 +145,14 @@ class PhoreDirectory extends PhoreUri
         return $ret;
     }
 
+    /**
+     * Import file contents of parameter 1 to this directory
+     *
+     * @param $filename
+     */
+    public function importZipFile($filename)
+    {
+        phore_exec("unzip :zipfile -d :folder", ["zipfile" => $filename, "folder" => (string)$this]);
+    }
+    
 }

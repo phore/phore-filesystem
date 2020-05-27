@@ -14,6 +14,9 @@ class PhoreTempDir extends PhoreDirectory
         $this->mkdir();
     }
 
+
+    
+
     public function __destruct()
     {
         $this->rmDir(true);
