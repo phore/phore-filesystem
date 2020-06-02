@@ -128,6 +128,34 @@ class PhoreUri
     }
 
 
+    /**
+     * Validate uri against fnmatch() pattern
+     *
+     * Parameter 1 can be string or array of patterns.
+     *
+     * Returns true if any of the patterns match - otherwise false is returned
+     *
+     * <example>
+     *   phore_uri()->fnmatch("*.php")
+     *   phore_uri()->fnmatch(["*.php", "*.js"]);
+     * </example>
+     *
+     * @param string|string[] $patterns
+     * @param int $flags
+     * @return bool
+     */
+    public function fnmatch ($patterns, int $flags=0) : bool
+    {
+        if ( ! is_array($patterns))
+            $patterns = [ $patterns ];
+        foreach ($patterns as $pattern) {
+            if (fnmatch($pattern, (string)$this, $flags))
+                return true;
+        }
+        return false;
+    }
+
+
     public function isDirectory () : bool
     {
         return file_exists($this->uri) && is_dir($this->uri);
