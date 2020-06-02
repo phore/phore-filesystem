@@ -170,6 +170,25 @@ class PhoreFile extends PhoreUri
         return $this;
     }
 
+    /**
+     * Create the directory for this file if it does
+     * not exist.
+     *
+     * <example>
+     *  phore_file("/some/path/to/file.txt")->mkdir()->put_contents();
+     * </example>
+     *
+     * @param $mode
+     * @return $this
+     */
+    public function mkdir($createMask=0777) : self
+    {
+        $parentDir = $this->getDirname()->asDirectory();
+        if ( ! $parentDir->exists())
+            $parentDir->mkdir($createMask);
+        return $this;
+    }
+
 
     /**
      * @param string $appendContent
