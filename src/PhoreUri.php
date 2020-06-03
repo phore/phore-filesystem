@@ -172,6 +172,22 @@ class PhoreUri
     }
 
 
+    /**
+     * Returns true, if the path is a subpath of the path specified in parameter 1
+     *
+     * <example>
+     *  assert(phore_uri("/some/path")->isSubpathOf("/some") === true)
+     * </example>
+     *
+     * @param $path
+     * @return bool
+     */
+    public function isSubpathOf($path) : bool
+    {
+        return startsWith((string)$this, (string)$path);
+    }
+
+
     public function assertDirectory (bool $createIfNotExisting=false) : PhoreDirectory
     {
         if ($createIfNotExisting === true && ! file_exists($this->uri)) {
