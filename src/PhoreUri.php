@@ -277,7 +277,7 @@ class PhoreUri
      * @param null $cwd
      * @return PhoreUri
      */
-    public function abs($cwd=null) : PhoreUri
+    public function abs(string $cwd=null) : PhoreUri
     {
         if ($cwd === null)
             $cwd = getcwd();
@@ -289,6 +289,33 @@ class PhoreUri
         }
         return new PhoreUri($newUri);
     }
+
+    /**
+     * Make a absolute path relative to the path provided in parameter 1
+     *
+     * If the path is already relative, return it. If it is not a subpath
+     * of the path throw error
+     *
+     * <example>
+     *  phore_uri("/some/absolute/path")->rel("/some") === "absolute/path"
+     *  phore_uri("reatlive/path")->rel("/some") === "relative/path"
+     * </example>
+     *
+     * @param string $rootPath
+     * @return PhoreUri
+     */
+    public function rel(string $rootPath) : PhoreUri
+    {
+        if ( ! startsWith($this->uri, "/"))
+            return new PhoreUri($this->uri);
+        if ( ! startsWith($this->uri, $rootPath))
+            throw new \InvalidArgumentException("Path '$this->uri' is not a subpath of '$rootPath'");
+        $newUri = substr($this->uri, strlen($rootPath));
+        if (startsWith($newUri, "/"))
+            $newUri = substr($newUri, 1);
+        return new PhoreUri($newUri);
+    }
+
 
     public function withFileName(string $filename, string $fileExtension="") : PhoreFile
     {
