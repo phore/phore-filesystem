@@ -239,6 +239,57 @@ class PhoreUri
     }
 
 
+    /**
+     * Join path
+     *
+     * <example>
+     *  phore_uri("/some/path/").join("sub", "file.txt") === "/some/path/sub/file.txt"
+     * </example>
+     *
+     * @param mixed ...$elements
+     * @return PhoreUri
+     */
+    public function join(...$elements) : PhoreUri
+    {
+        $newUri = $this->uri;
+        if (endsWith($newUri, "/"))
+            $newUri = substr($newUri, 0, -1);
+        foreach ($elements as $element) {
+            if (startsWith($element, "/"))
+                $element = substr($element, 1);
+            $newUri .= "/$element";
+        }
+        return new PhoreUri($newUri);
+    }
+
+
+    /**
+     * Transform to absolute path
+     *
+     * The optional parameter can be used to specify a dedicated root directory.
+     * If empty getcwd() will be used.
+     *
+     * <example>
+     *  phore_uri("relative/path/to/file")->abs("/root/dir") === "/root/dir/relative/path/to/file"
+     *  phore_uri("/absolute/path")->abs("/root/dir") === "/absolute/path"
+     * </example>
+     *
+     * @param null $cwd
+     * @return PhoreUri
+     */
+    public function abs($cwd=null) : PhoreUri
+    {
+        if ($cwd === null)
+            $cwd = getcwd();
+        $newUri = $this->uri;
+        if ( ! startsWith($newUri, "/")) {
+            if (endsWith($cwd, "/"))
+                $cwd = substr($cwd, 0, -1);
+            $newUri = $cwd . "/" . $newUri;
+        }
+        return new PhoreUri($newUri);
+    }
+
     public function withFileName(string $filename, string $fileExtension="") : PhoreFile
     {
         if ($fileExtension !== "" && ! ctype_alnum($fileExtension))
