@@ -191,7 +191,9 @@ class PhoreUri
     public function assertDirectory (bool $createIfNotExisting=false) : PhoreDirectory
     {
         if ($createIfNotExisting === true && ! file_exists($this->uri)) {
-            mkdir($this->uri);
+            if (!mkdir($concurrentDirectory = $this->uri, 0777) && !is_dir($concurrentDirectory)) {
+                throw new \RuntimeException(sprintf('Directory "%s" was not created', $concurrentDirectory));
+            }
         }
         if (file_exists($this->uri) && is_dir($this->uri))
             return new PhoreDirectory($this->uri);
