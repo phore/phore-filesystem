@@ -275,7 +275,7 @@ class PhoreFile extends PhoreUri
         }
         try {
             return phore_hydrate($data, $className, $strict);
-        } catch (InvalidStructureException $e) {
+        } catch (\Exception $e) {
             throw new \InvalidArgumentException("Hydration of file '{$this->getUri()}' failed: " . $e->getMessage(), 0, $e);
         }
     }
