@@ -15,6 +15,7 @@ use Phore\FileSystem\Exception\FileNotFoundException;
 use Phore\FileSystem\Exception\FileParsingException;
 use Phore\FileSystem\Exception\FilesystemException;
 use Phore\FileSystem\Exception\PathOutOfBoundsException;
+use Phore\Hydrator\Ex\InvalidStructureException;
 
 class PhoreFile extends PhoreUri
 {
@@ -246,9 +247,9 @@ class PhoreFile extends PhoreUri
 
     /**
      * Hydrate a file (json or yaml) into a Object
-     * 
+     *
      * Requires phore/hydrator
-     * 
+     *
      * @param string $className
      * @param bool $strict
      * @return array|bool|float|int|object|string|null
@@ -274,8 +275,8 @@ class PhoreFile extends PhoreUri
         }
         try {
             return phore_hydrate($data, $className, $strict);
-        } catch (\Exception $e) {
-            throw new $e("Hydration of file '{$this->getUri()}' failed: " . $e->getMessage());
+        } catch (InvalidStructureException $e) {
+            throw new \InvalidArgumentException("Hydration of file '{$this->getUri()}' failed: " . $e->getMessage(), 0, $e);
         }
     }
 
