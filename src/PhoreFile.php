@@ -245,6 +245,42 @@ class PhoreFile extends PhoreUri
     }
 
     /**
+     * Hydrate a file (json or yaml) into a Object
+     * 
+     * Requires phore/hydrator
+     * 
+     * @param string $className
+     * @param bool $strict
+     * @return array|bool|float|int|object|string|null
+     * @throws FileNotFoundException
+     * @throws FileParsingException
+     * @throws \Phore\Hydrator\Ex\HydratorInputDataException
+     * @throws \Phore\Hydrator\Ex\InvalidStructureException
+     */
+    public function hydrate(string $className, bool $strict = true)
+    {
+        if ( ! function_exists("phore_hydrate"))
+            throw new \InvalidArgumentException("Cant hydrate: phore/hydrator is not installed.");
+        switch ($this->getExtension()) {
+            case "json":
+                $data = $this->get_json();
+                break;
+            case "yml":
+            case "yaml":
+                $data = $this->get_yaml();
+                break;
+            default:
+                throw new \InvalidArgumentException("Can't hydrate: Unknown file extension '{$this->getExtension()}'");
+        }
+        try {
+            return phore_hydrate($data, $className, $strict);
+        } catch (\Exception $e) {
+            throw new $e("Hydration of file '{$this->getUri()}' failed: " . $e->getMessage());
+        }
+    }
+
+
+    /**
      * @param null $content
      *
      * @return $this|array
