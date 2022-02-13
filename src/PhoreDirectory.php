@@ -112,14 +112,12 @@ class PhoreDirectory extends PhoreUri
             if ($curSub == "." || $curSub == "..")
                 continue;
 
-            $curRelPath = $_relpath;
-
             $path = $this->withSubPath($curSub);
             if ($path->isDirectory() && $recursive === true) {
                 $path = $path->assertDirectory();
 
 
-                foreach ($path->genWalk($filter, $recursive, ) as $subPath) {
+                foreach ($path->genWalk($filter, $recursive) as $subPath) {
                     yield $subPath;
                 }
             }
