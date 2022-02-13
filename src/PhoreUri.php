@@ -19,11 +19,30 @@ class PhoreUri
 
     protected $uri;
 
-    public function __construct(string $uri)
+    /**
+     * The Relative path
+     *
+     * Only set if this path was generatet by genWalk() or by calling withSubPath()
+     *
+     * Will contain the full name without leading slash
+     *
+     * @var string[]|null
+     */
+    protected $relPath = null;
+    
+    public function __construct(string $uri, array $__relPath=null)
     {
         $this->uri = $uri;
+        $this->relPath = $__relPath;
     }
 
+
+    public function getRelPath() : ?string
+    {
+        if ($this->relPath === null)
+            return null;
+        return implode("/", $this->relPath);
+    }
 
     /**
      * some/path/demo.inc.txt => some/path
@@ -78,6 +97,11 @@ class PhoreUri
     {
         $parts = explode("/", $subpath);
         $ret = [];
+
+        $relPath = $this->relPath;
+        if ($relPath === null)
+            $relPath = [];
+
         foreach ($parts as $part) {
             if ($part == "")
                 continue;
@@ -90,12 +114,14 @@ class PhoreUri
                 continue;
             }
             $ret[] = $part;
+            $relPath[] = $part;
         }
         $startUri = $this->uri;
         if ($this instanceof PhoreFile) {
             $startUri = dirname($startUri);
         }
-        return new PhoreUri($startUri .= "/" . implode("/", $ret));
+
+        return new PhoreUri($startUri .= "/" . implode("/", $ret), $relPath);
     }
 
     public function withRelativePath (string $relpath) : PhoreUri
@@ -124,7 +150,7 @@ class PhoreUri
             $ret[] = $part;
         }
 
-        return new PhoreUri($prefix . implode("/", $ret));
+        return new PhoreUri($prefix . implode("/", $ret), $ret);
     }
 
 
@@ -196,7 +222,7 @@ class PhoreUri
             }
         }
         if (file_exists($this->uri) && is_dir($this->uri))
-            return new PhoreDirectory($this->uri);
+            return new PhoreDirectory($this->uri, $this->relPath);
         throw new FilesystemException("Uri '$this->uri' is not a valid directory.");
     }
 
@@ -205,7 +231,7 @@ class PhoreUri
     public function assertFile () : PhoreFile
     {
         if (file_exists($this->uri) && is_file($this->uri))
-            return new PhoreFile($this->uri);
+            return new PhoreFile($this->uri, $this->relPath);
         throw new FilesystemException("Uri '$this->uri' is not a valid file.");
     }
 
@@ -237,7 +263,7 @@ class PhoreUri
 
     public function asFile() : PhoreFile
     {
-        return new PhoreFile($this->uri);
+        return new PhoreFile($this->uri, $this->relPath);
     }
 
 
@@ -325,12 +351,13 @@ class PhoreUri
             throw new \InvalidArgumentException("File extension '$fileExtension' must not contain special chars.");
         if ($fileExtension !== "")
             $fileExtension = "." . $fileExtension;
+        
         return new PhoreFile($this->uri . "/" . addslashes($filename) . $fileExtension);
     }
 
 
     public function asDirectory() : PhoreDirectory
     {
-        return new PhoreDirectory($this->uri);
+        return new PhoreDirectory($this->uri, $this->relPath);
     }
 }

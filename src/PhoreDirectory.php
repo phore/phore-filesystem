@@ -103,7 +103,7 @@ class PhoreDirectory extends PhoreUri
      * @throws Exception\PathOutOfBoundsException
      * @throws FileAccessException
      */
-    public function genWalk(string $filter = null, bool $recursive = false) : \Iterator
+    public function genWalk(string $filter = null, bool $recursive = false, array $_relpath=[]) : \Iterator
     {
         $dirFp = opendir($this->uri);
         if (!$dirFp)
@@ -112,11 +112,15 @@ class PhoreDirectory extends PhoreUri
             if ($curSub == "." || $curSub == "..")
                 continue;
 
+            $curRelPath = $_relpath;
+            $curRelPath[] = $curSub;
+
             $path = $this->withSubPath($curSub);
             if ($path->isDirectory() && $recursive === true) {
                 $path = $path->assertDirectory();
 
-                foreach ($path->genWalk($filter, $recursive) as $subPath) {
+
+                foreach ($path->genWalk($filter, $recursive, ) as $subPath) {
                     yield $subPath;
                 }
             }
