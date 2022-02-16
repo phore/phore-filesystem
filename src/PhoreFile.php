@@ -360,7 +360,7 @@ class PhoreFile extends PhoreUri
     public function get_serialized($allowedClasses=false) : array
     {
         $serialize = phore_unserialize($this->get_contents(), $allowedClasses);
-        if ($serialize === null) {
+        if ($serialize === false) {
             throw new FileParsingException(
                 "Unserialize of file '{$this->uri}' failed."
             );
