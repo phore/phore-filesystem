@@ -236,7 +236,7 @@ class PhoreFile extends PhoreUri
      * @throws FileNotFoundException
      * @throws FileParsingException
      */
-    public function get_yaml(string $class=null) : array|object
+    public function get_yaml(string $class=null) : array
     {
         try {
             $textData = $this->get_contents();
