@@ -9,6 +9,7 @@
 namespace Phore\FileSystem;
 
 
+use mysql_xdevapi\Exception;
 use Phore\Core\Exception\InvalidDataException;
 use Phore\FileSystem\Exception\FileAccessException;
 use Phore\FileSystem\Exception\FileNotFoundException;
@@ -17,6 +18,10 @@ use Phore\FileSystem\Exception\FilesystemException;
 use Phore\FileSystem\Exception\PathOutOfBoundsException;
 use Phore\Hydrator\Ex\InvalidStructureException;
 
+
+/**
+ * @template T
+ */
 class PhoreFile extends PhoreUri
 {
 
@@ -223,13 +228,15 @@ class PhoreFile extends PhoreUri
     }
 
     /**
-     * @param null $content
      *
-     * @return $this|array
+     * @template T
+     * @param class-string<T> $class
+     * @return T|array
+     * @throws FileAccessException
      * @throws FileNotFoundException
-     * @throws \Exception
+     * @throws FileParsingException
      */
-    public function get_yaml() : array
+    public function get_yaml(string $class=null) : array|object
     {
         try {
             $textData = $this->get_contents();
@@ -241,6 +248,16 @@ class PhoreFile extends PhoreUri
             $ret = phore_yaml_decode($textData);
         } catch (\InvalidArgumentException $e) {
             throw new FileParsingException($e->getMessage() . " in file '{$this->getUri()}'", 0, $e);
+        }
+        if ($class !== null) {
+            if ( ! function_exists("phore_hydrate"))
+                throw new \InvalidArgumentException("Package phore/hydrator is required but not installed to hydrate yaml content");
+
+            try {
+                return phore_hydrate($ret, $class);
+            } catch (\Exception $e) {
+                throw new FileParsingException("Hydration of file '{$this->getUri()}' failed: {$e->getMessage()}", 0, $e);
+            }
         }
         return $ret;
     }
