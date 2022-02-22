@@ -323,7 +323,7 @@ class PhoreUri
         foreach ($elements as $element) {
             if ($element === "." || $element === "..")
                 throw new \InvalidArgumentException("Path security violation: path must not contain '.' or '..'");
-            $path = $this->join(addslashes($element));
+            $path = $path->join(addslashes($element));
         }
 
         return $path;
