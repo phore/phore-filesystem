@@ -47,6 +47,7 @@ class PhoreFile extends PhoreUri
 
     public function fopen(string $mode) : FileStream
     {
+        $this->validate();
         $stream = new FileStream($this, $mode);
         return $stream;
     }
@@ -54,12 +55,14 @@ class PhoreFile extends PhoreUri
 
     public function gzopen(string $mode) : GzFileStream
     {
+        $this->validate();
         $stream = new GzFileStream($this, $mode);
         return $stream;
     }
 
     private function _read_content_locked ()
     {
+        $this->validate();
         $file = $this->fopen("r")->flock(LOCK_SH);
         $buf = "";
         while ( ! $file->feof())
@@ -73,6 +76,7 @@ class PhoreFile extends PhoreUri
 
     private function _write_content_locked ($content, bool $append = false)
     {
+        $this->validate();
         $mode = "w+";
         if ($append)
             $mode = "a+";
@@ -107,6 +111,7 @@ class PhoreFile extends PhoreUri
      */
     public function streamCopyTo($destinationFile, int $maxlen=null)
     {
+        $this->validate();
         $destinationFile = phore_file($destinationFile);
         $targetStream = $destinationFile->fopen("w+");
 
@@ -131,6 +136,7 @@ class PhoreFile extends PhoreUri
      */
     public function tail(int $bytes)
     {
+        $this->validate();
         $stream = $this->fopen("r");
 
         // Use actual size from fstat - Important: fstat() won't rely on statcache
@@ -152,6 +158,7 @@ class PhoreFile extends PhoreUri
      */
     public function createPath(int $createMask=0777) : self
     {
+        $this->validate();
         phore_dir($this->getDirname())->mkdir($createMask);
         return $this;
     }
@@ -171,6 +178,7 @@ class PhoreFile extends PhoreUri
 
     public function chown (string $owner) : self
     {
+        $this->validate();
         if ( ! chown($this->uri, $owner))
             throw new FilesystemException("Cannot chown $this->uri to user $owner");
         return $this;
@@ -189,6 +197,7 @@ class PhoreFile extends PhoreUri
      */
     public function mkdir($createMask=0777) : self
     {
+        $this->validate();
         $parentDir = $this->getDirname()->asDirectory();
         if ( ! $parentDir->exists())
             $parentDir->mkdir($createMask);
@@ -224,6 +233,7 @@ class PhoreFile extends PhoreUri
      */
     public function fileSize () : int
     {
+        $this->validate();
         return filesize($this->uri);
     }
 
@@ -345,6 +355,7 @@ class PhoreFile extends PhoreUri
      */
     public function set_csv(array $data) : self
     {
+        $this->validate();
         $keys = [];
         foreach ($data as $val) {
             foreach ($val as $key => $val)
@@ -415,6 +426,7 @@ class PhoreFile extends PhoreUri
 
     public function walkCSV (callable $callback) : bool
     {
+        $this->validate();
         if ($this->csvOptions === null)
             throw new \InvalidArgumentException("Unset csv options. Call withCsvOptions() before!");
         if ($this->csvOptions["parseHeader"] === true) {
@@ -509,6 +521,7 @@ class PhoreFile extends PhoreUri
      */
     public function gunzip () : PhoreTempFile
     {
+        $this->validate();
         $tmp = phore_tempfile();
         $tmpWriter = $tmp->fopen("w+");
         $inFileStream = $this->gzopen("r");
@@ -528,6 +541,7 @@ class PhoreFile extends PhoreUri
      */
     public function touch($mode="0777") : self
     {
+        $this->validate();
         if ( ! file_exists($this->uri)) {
             mkdir(dirname($this->uri),  $mode, true);
             touch($this->uri);
@@ -541,12 +555,14 @@ class PhoreFile extends PhoreUri
 
     public function getFilesize() : int
     {
+        $this->validate();
         return filesize($this->uri);
     }
 
 
     public function rename ($newName) : self
     {
+        $this->validate($newName);
         if ( ! @rename($this->uri, $newName))
             throw new FileAccessException("Cannot rename file '{$this->uri}' to '{$newName}': " . implode(" ", error_get_last()));
         $this->filename = $newName;
@@ -555,6 +571,7 @@ class PhoreFile extends PhoreUri
 
     public function unlink() : self
     {
+        $this->validate();
         if ( ! @unlink($this->uri))
             throw new FileAccessException("Cannot unlink file '{$this->uri}': " . implode(" ", error_get_last()));
         return $this;

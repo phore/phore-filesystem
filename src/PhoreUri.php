@@ -29,11 +29,23 @@ class PhoreUri
      * @var string[]|null
      */
     protected $relPath = null;
-    
+
     public function __construct(string $uri, array $__relPath=null)
     {
         $this->uri = $uri;
+        $this->validate();
         $this->relPath = $__relPath;
+    }
+
+
+    public function validate(string $optFileName = null)
+    {
+        if (strpos($this->uri, "\0") !== false) {
+            throw new \Exception("Null-byte character detected in uri.");
+        }
+        if ($optFileName !== null && strpos($optFileName, "\0") !== false) {
+            throw new \Exception("Null-byte character detected in uri.(parameter 1)");
+        }
     }
 
 
@@ -216,6 +228,7 @@ class PhoreUri
 
     public function assertDirectory (bool $createIfNotExisting=false) : PhoreDirectory
     {
+        $this->validate();
         if ($createIfNotExisting === true && ! file_exists($this->uri)) {
             if (!mkdir($concurrentDirectory = $this->uri, 0777, true) && !is_dir($concurrentDirectory)) {
                 throw new \RuntimeException(sprintf('Directory "%s" was not created', $concurrentDirectory));
@@ -230,6 +243,7 @@ class PhoreUri
 
     public function assertFile () : PhoreFile
     {
+        $this->validate();
         if (file_exists($this->uri) && is_file($this->uri))
             return new PhoreFile($this->uri, $this->relPath);
         throw new FilesystemException("Uri '$this->uri' is not a valid file.");
@@ -237,6 +251,7 @@ class PhoreUri
 
     public function assertReadable () : self
     {
+        $this->validate();
         if ( ! is_readable($this->uri))
             throw new FileAccessException("Uri '$this->uri' is not readable");
         return $this;
@@ -244,6 +259,7 @@ class PhoreUri
 
     public function assertWritable () : self
     {
+        $this->validate();
         if ( ! is_writable($this->uri))
             throw new FileAccessException("Uri '$this->uri' is not writable");
         return $this;
@@ -252,17 +268,20 @@ class PhoreUri
 
     public function getUri() : string
     {
+        $this->validate();
         return $this->uri;
     }
 
 
     public function __toString()
     {
+        $this->validate();
         return $this->uri;
     }
 
     public function asFile() : PhoreFile
     {
+        $this->validate();
         return new PhoreFile($this->uri, $this->relPath);
     }
 
@@ -290,6 +309,25 @@ class PhoreUri
         return new PhoreUri($newUri);
     }
 
+
+    /**
+     * Securely join a path with each element as
+     * a directory.
+     *
+     * @param ...$elements
+     * @return PhoreUri
+     */
+    public function join_secure(...$elements) : PhoreUri
+    {
+        $path = $this;
+        foreach ($elements as $element) {
+            if ($element === "." || $element === "..")
+                throw new \InvalidArgumentException("Path security violation: path must not contain '.' or '..'");
+            $path = $this->join(addslashes($element));
+        }
+
+        return $path;
+    }
 
     /**
      * Transform to absolute path
@@ -351,7 +389,7 @@ class PhoreUri
             throw new \InvalidArgumentException("File extension '$fileExtension' must not contain special chars.");
         if ($fileExtension !== "")
             $fileExtension = "." . $fileExtension;
-        
+
         return new PhoreFile($this->uri . "/" . addslashes($filename) . $fileExtension);
     }
 

@@ -19,6 +19,7 @@ class PhoreDirectory extends PhoreUri
 
     public function mkdir($createMask=0777) : self
     {
+        $this->validate();
         if ( ! is_dir($this->uri))
             mkdir($this->uri, $createMask, true);
         return $this;
@@ -37,6 +38,7 @@ class PhoreDirectory extends PhoreUri
 
     public function rmDir($recursive=false) : self
     {
+        $this->validate();
         if ( ! is_dir($this->uri))
             return $this;
 
@@ -51,6 +53,7 @@ class PhoreDirectory extends PhoreUri
 
     public function chown ($owner) : self
     {
+        $this->validate();
         if ( ! chown($this->uri, $owner))
             throw new FilesystemException("Cannot chown $this->uri to user $owner");
         return $this;
@@ -59,6 +62,7 @@ class PhoreDirectory extends PhoreUri
 
     public function walk(callable $fn, string $filter=null) : bool
     {
+        $this->validate();
         $dirFp = opendir($this->uri);
         if (!$dirFp)
             throw new FileAccessException("Cannot open path '{$this->uri}' for indexing.");
@@ -88,6 +92,7 @@ class PhoreDirectory extends PhoreUri
 
     public function walkR(callable $fn, string $filter=null) : bool
     {
+        $this->validate();
         return $this->walk(function (PhoreUri $uri) use ($fn, $filter) {
             if ($uri->isDirectory()) {
                 return $uri->asDirectory()->walkR($fn, $filter);
@@ -105,6 +110,7 @@ class PhoreDirectory extends PhoreUri
      */
     public function genWalk(string $filter = null, bool $recursive = false) : \Iterator
     {
+        $this->validate();
         $dirFp = opendir($this->uri);
         if (!$dirFp)
             throw new FileAccessException("Cannot open path '{$this->uri}' for indexing.");
@@ -143,6 +149,7 @@ class PhoreDirectory extends PhoreUri
      */
     public function getListSorted(string $filter=null) : array
     {
+        $this->validate();
         $ret = [];
         $this->walk(function(PhoreUri $uri) use (&$ret) {
             $ret[] = $uri;
@@ -162,6 +169,8 @@ class PhoreDirectory extends PhoreUri
      */
     public function importZipFile($filename)
     {
+        $this->validate();
+        $this->validate($filename);
         phore_exec("unzip :zipfile -d :folder", ["zipfile" => $filename, "folder" => (string)$this]);
     }
 
@@ -170,7 +179,7 @@ class PhoreDirectory extends PhoreUri
      * if found, thorws FileNotFoundException if not.
      *
      * If parameter 2 is specified, it will contain the machtes from preg_match()
-     * 
+     *
      * <example>
      * phore_dir("/tmp")->getFileByPattern("/^some[0-9]\.txt$/")->get_contents();
      * </example>
@@ -182,6 +191,7 @@ class PhoreDirectory extends PhoreUri
      */
     public function getFileByPattern(string $regex, &$matches = null) : PhoreFile
     {
+        $this->validate();
         $found = null;
         $this->walkR(function (PhoreUri $uri) use ($regex, &$found, &$matches) {
             if (preg_match($regex, (string)$uri, $matches) && $uri->isFile()) {
