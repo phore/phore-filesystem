@@ -20,8 +20,11 @@ class PhoreDirectory extends PhoreUri
     public function mkdir($createMask=0777) : self
     {
         $this->validate();
-        if ( ! is_dir($this->uri))
-            mkdir($this->uri, $createMask, true);
+        if ( ! is_dir($this->uri)) {
+            if (!mkdir($concurrentDirectory = $this->uri, $createMask, true) && !is_dir($concurrentDirectory)) {
+                throw new \RuntimeException(sprintf('Directory "%s" was not created', $concurrentDirectory));
+            }
+        }
         return $this;
     }
 
