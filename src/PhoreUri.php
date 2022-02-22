@@ -323,9 +323,12 @@ class PhoreUri
         foreach ($elements as $element) {
             if ($element === "." || $element === "..")
                 throw new \InvalidArgumentException("Path security violation: path must not contain '.' or '..'");
-            $path = $path->join(addcslashes($element, "\\/\n\r\t"));
-        }
 
+            $element = urlencode($element);
+            if (strlen($element) === 0)
+                throw new \InvalidArgumentException("Path must not contain empty string element");
+            $path = $path->join($element);
+        }
         return $path;
     }
 
