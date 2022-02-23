@@ -327,7 +327,7 @@ class PhoreUri
             $element = urlencode($element);
             if (strlen($element) === 0)
                 throw new \InvalidArgumentException("Path must not contain empty string element");
-            $path = $path->join(addcslashes($element, "%"));
+            $path = $path->join($element);
         }
         return $path;
     }
