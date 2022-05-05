@@ -244,7 +244,7 @@ class PhoreFile extends PhoreUri
      * @throws FileNotFoundException
      * @throws FileParsingException
      */
-    public function get_yaml(string $cast=null) : array
+    public function get_yaml(string $cast=null)
     {
         try {
             $textData = $this->get_contents();
