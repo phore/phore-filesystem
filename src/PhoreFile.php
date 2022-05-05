@@ -19,9 +19,7 @@ use Phore\FileSystem\Exception\PathOutOfBoundsException;
 use Phore\Hydrator\Ex\InvalidStructureException;
 
 
-/**
- * @template T
- */
+
 class PhoreFile extends PhoreUri
 {
 
@@ -240,13 +238,13 @@ class PhoreFile extends PhoreUri
     /**
      *
      * @template T
-     * @param class-string<T> $class
-     * @return T|array
+     * @param class-string<T> $cast
+     * @return array|T
      * @throws FileAccessException
      * @throws FileNotFoundException
      * @throws FileParsingException
      */
-    public function get_yaml(string $class=null)
+    public function get_yaml(string $cast=null) : array|object
     {
         try {
             $textData = $this->get_contents();
@@ -259,12 +257,12 @@ class PhoreFile extends PhoreUri
         } catch (\InvalidArgumentException $e) {
             throw new FileParsingException($e->getMessage() . " in file '{$this->getUri()}'", 0, $e);
         }
-        if ($class !== null) {
+        if ($cast !== null) {
             if ( ! function_exists("phore_hydrate"))
                 throw new \InvalidArgumentException("Package phore/hydrator is required but not installed to hydrate yaml content");
 
             try {
-                return phore_hydrate($ret, $class);
+                return phore_hydrate($ret, $cast);
             } catch (\Exception $e) {
                 throw new FileParsingException("Hydration of file '{$this->getUri()}' failed: {$e->getMessage()}", 0, $e);
             }
@@ -341,7 +339,7 @@ class PhoreFile extends PhoreUri
 
     public function set_yaml(array $data) : self
     {
-        $this->set_contents(yaml_emit($data));
+        $this->set_contents(phore_yaml_encode($data));
         return $this;
     }
 
