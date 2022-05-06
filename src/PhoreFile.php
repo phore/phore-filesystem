@@ -537,7 +537,7 @@ class PhoreFile extends PhoreUri
      * @param string $mode
      * @return PhoreFile
      */
-    public function touch($mode="0777") : self
+    public function touch(int $mode=0777) : self
     {
         $this->validate();
         if ( ! file_exists($this->uri)) {
