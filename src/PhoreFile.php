@@ -541,7 +541,8 @@ class PhoreFile extends PhoreUri
     {
         $this->validate();
         if ( ! file_exists($this->uri)) {
-            mkdir(dirname($this->uri),  $mode, true);
+            if ( ! file_exists(dirname($this->uri)))
+                mkdir(dirname($this->uri),  $mode, true);
             touch($this->uri);
             chmod($this->uri, $mode);
         }
