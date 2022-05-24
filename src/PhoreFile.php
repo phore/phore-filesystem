@@ -330,9 +330,9 @@ class PhoreFile extends PhoreUri
      * @return $this|array
      * @throws FileParsingException
      */
-    public function set_json(array $data) : self
+    public function set_json(array $data, bool $prettyPrint=false) : self
     {
-        $this->set_contents(phore_json_encode($data));
+        $this->set_contents(phore_json_encode($data, $prettyPrint));
         return $this;
     }
 
