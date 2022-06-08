@@ -147,21 +147,26 @@ class PhoreDirectory extends PhoreUri
 
 
     /**
-     * @return PhoreUri[]
+     * @return PhoreUri[]|string[]
      * @throws FileAccessException
      */
-    public function getListSorted(string $filter=null, bool $recursive = false) : array
+    public function getListSorted(string $filter=null, bool $recursive = false, bool $returnRelPathAsString=false) : array
     {
         $this->validate();
         $ret = [];
         foreach ($this->genWalk($filter, $recursive) as $path) {
-            $ret[] = $path;
+            if ($returnRelPathAsString) {
+                $ret[] = $path->getRelPath();
+            } else {
+                $ret[] = $path;
+            }
         }
-        usort($ret, function (PhoreUri $a, PhoreUri $b) {
+        usort($ret, function ($a, $b) {
             if ((string)$a == (string)$b)
                 return 0;
             return ((string)$a < (string)$b) ? -1 : 1;
         });
+        
         return $ret;
     }
 
