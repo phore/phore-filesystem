@@ -26,7 +26,7 @@
     "phore/core": "*"
   },
   "require-dev": {
-    "phpunit/phpunit": "^8.0@dev"
+    "phpunit/phpunit": "^9.5"
   },
   "suggest": {
   },

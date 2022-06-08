@@ -2,8 +2,8 @@
 # Run ./kickstart.sh to start a development-container for this project
 version: 1
 from: "ghcr.io/nfra-project/kickstart-flavor-php:8.1"
+packages: [php8.1-curl, php8.1-http, php8.1-raphf, php8.1-dom]
 
-apache_fallback_resource: "/index.php"
 
 command:
   init:
