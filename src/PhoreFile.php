@@ -78,7 +78,7 @@ class PhoreFile extends PhoreUri
         $mode = "w+";
         if ($append)
             $mode = "a+";
-        $this->fopen($mode)->flock(LOCK_EX)->fwrite($content)->flock(LOCK_UN)->fclose();
+        $this->fopen($mode)->flock(LOCK_EX)->fwrite($content)->datasync()->fclose();
     }
 
     /**

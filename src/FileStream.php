@@ -23,7 +23,7 @@ class FileStream implements StreamInterface
 
     /**
      * FileStream constructor.
-     * @param string|PhoreFile $file 
+     * @param string|PhoreFile $file
      * @param string $mode
      * @throws FileAccessException
      */
@@ -52,16 +52,24 @@ class FileStream implements StreamInterface
             throw new FileAccessException("fopen($this->file): " . error_get_last()["message"]);
         return $this;
     }
-    
-    public function flock(int $operation) : FileStream 
+
+    public function flock(int $operation) : FileStream
     {
-        if ( ! @flock($this->res, $operation)) {
+        if ( ! flock($this->res, $operation)) {
             throw new FileAccessException("Cannot flock('$this->file'): " . error_get_last()["message"]);
         }
         return $this;
     }
 
-    public function feof() : bool 
+    public function datasync() : FileStream
+    {
+        if ( ! fdatasync($this->res)) {
+            throw new FileAccessException("Cannot fflush('$this->file'): " . error_get_last()["message"]);
+        }
+        return $this;
+    }
+
+    public function feof() : bool
     {
         return @feof($this->res);
     }
@@ -73,14 +81,14 @@ class FileStream implements StreamInterface
         return $this;
     }
 
-    public function fread (int $length) : string 
+    public function fread (int $length) : string
     {
         if (false === ($data = @fread($this->res, $length)))
             throw new FileAccessException("Cannot get fread('$this->file'): " . error_get_last()["message"]);
         return $data;
     }
 
-    public function fgets (int $length=null) 
+    public function fgets (int $length=null)
     {
         if ($length !== null) {
             if (false === ($data = @fgets($this->res, $length)) && ! @feof($this->res))
@@ -103,19 +111,19 @@ class FileStream implements StreamInterface
         return $data;
     }
 
-    public function fputcsv (array $fields, string $delimiter=",", string $enclosure='"', string $escape_char = "\\") : FileStream 
+    public function fputcsv (array $fields, string $delimiter=",", string $enclosure='"', string $escape_char = "\\") : FileStream
     {
         if (false === @fputcsv($this->res, $fields, $delimiter, $enclosure, $escape_char))
             throw new FileAccessException("Cannot get fgets('$this->file'): " . error_get_last()["message"]);
         return $this;
     }
-    
-    public function isOpen() : bool 
+
+    public function isOpen() : bool
     {
         return is_resource($this->res);
     }
-    
-    public function fclose() : PhoreFile 
+
+    public function fclose() : PhoreFile
     {
         if (false === @fclose($this->res))
             throw new FileAccessException("Cannot get fclose('$this->file'): " . error_get_last()["message"]);
