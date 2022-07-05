@@ -65,7 +65,6 @@ class PhoreFile extends PhoreUri
         $buf = "";
         while ( ! $file->feof())
             $buf .= $file->fread(1024);
-        $file->flock(LOCK_UN);
         $file->fclose();
         return $buf;
     }

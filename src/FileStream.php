@@ -63,7 +63,7 @@ class FileStream implements StreamInterface
 
     public function datasync() : FileStream
     {
-        if ( ! fdatasync($this->res)) {
+        if ( ! fsync($this->res)) {
             throw new FileAccessException("Cannot fflush('$this->file'): " . error_get_last()["message"]);
         }
         return $this;
