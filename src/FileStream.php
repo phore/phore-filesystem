@@ -27,14 +27,14 @@ class FileStream implements StreamInterface
      * @param string $mode
      * @throws FileAccessException
      */
-    public function __construct($file, string $mode)
+    public function __construct($file, string $mode, int $fileLock=null)
     {
         if (is_string($file))
             $file = new PhoreFile($file);
         if ( ! $file instanceof PhoreFile)
             throw new \InvalidArgumentException("Parameter 1 must be filename (string) or PhoreFile");
         $this->file = $file;
-        $this->fopen((string)$file, $mode);
+        $this->fopen((string)$file, $mode, $fileLock);
     }
 
 
@@ -44,10 +44,12 @@ class FileStream implements StreamInterface
     }
 
 
-    protected function fopen (string $filename, string $mode) : FileStream
+    protected function fopen (string $filename, string $mode, int $fileLock=null) : FileStream
     {
         $this->file = $filename;
         $this->res = fopen($filename, $mode);
+        if ($fileLock !== null)
+            flock($this->res, $fileLock);
         if ( ! $this->res)
             throw new FileAccessException("fopen($this->file): " . error_get_last()["message"]);
         return $this;

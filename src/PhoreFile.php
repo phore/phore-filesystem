@@ -43,10 +43,10 @@ class PhoreFile extends PhoreUri
     }
 
 
-    public function fopen(string $mode) : FileStream
+    public function fopen(string $mode, int $fileLock=null) : FileStream
     {
         $this->validate();
-        $stream = new FileStream($this, $mode);
+        $stream = new FileStream($this, $mode, $fileLock);
         return $stream;
     }
 
@@ -61,7 +61,7 @@ class PhoreFile extends PhoreUri
     private function _read_content_locked ()
     {
         $this->validate();
-        $file = $this->fopen("r")->flock(LOCK_SH);
+        $file = $this->fopen("r", LOCK_SH);
         $buf = "";
         while ( ! $file->feof())
             $buf .= $file->fread(1024);
@@ -77,7 +77,7 @@ class PhoreFile extends PhoreUri
         $mode = "w+";
         if ($append)
             $mode = "a+";
-        $this->fopen($mode)->flock(LOCK_EX)->fwrite($content)->datasync()->fclose();
+        $this->fopen($mode, LOCK_EX)->fwrite($content)->datasync()->fclose();
     }
 
     /**
