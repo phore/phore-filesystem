@@ -48,10 +48,11 @@ class FileStream implements StreamInterface
     {
         $this->file = $filename;
         $this->res = fopen($filename, $mode);
-        if ($fileLock !== null)
-            flock($this->res, $fileLock);
+        
         if ( ! $this->res)
             throw new FileAccessException("fopen($this->file): " . error_get_last()["message"]);
+        if ($fileLock !== null)
+            flock($this->res, $fileLock);
         return $this;
     }
 
