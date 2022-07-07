@@ -365,7 +365,12 @@ class PhoreFile extends PhoreUri
         foreach ($data as $row) {
             $cur = [];
             foreach ($keys as $key) {
-                $cur[] = isset($row[$key]) ? $row[$key] : "";
+                if (is_object($row)) {
+                    $cur[] = isset($row->$key) ? $row->$key : "";
+                } else {
+                    $cur[] = isset($row[$key]) ? $row[$key] : "";
+                }
+                
             }
             $s->fputcsv($cur);
         }
