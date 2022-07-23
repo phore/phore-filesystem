@@ -43,10 +43,10 @@ class PhoreFile extends PhoreUri
     }
 
 
-    public function fopen(string $mode, int $fileLock=null) : FileStream
+    public function fopen(string $mode) : FileStream
     {
         $this->validate();
-        $stream = new FileStream($this, $mode, $fileLock);
+        $stream = new FileStream($this, $mode);
         return $stream;
     }
 
@@ -64,7 +64,7 @@ class PhoreFile extends PhoreUri
         $file = $this->fopen("r", LOCK_SH);
         $buf = "";
         while ( ! $file->feof())
-            $buf .= $file->fread(1024);
+            $buf .= $file->fread(32000);
         $file->fclose();
         return $buf;
     }
@@ -74,10 +74,13 @@ class PhoreFile extends PhoreUri
     private function _write_content_locked ($content, bool $append = false)
     {
         $this->validate();
-        $mode = "w+";
-        if ($append)
-            $mode = "a+";
-        $this->fopen($mode, LOCK_EX)->fwrite($content)->datasync()->fclose();
+        $stream = $this->fopen("a+");
+        $stream->flock(LOCK_EX);
+        if ($append === false)
+            $stream->truncate(0);
+        $stream->fwrite($content);
+        $stream->datasync();
+        $stream->close();
     }
 
     /**
@@ -370,7 +373,7 @@ class PhoreFile extends PhoreUri
                 } else {
                     $cur[] = isset($row[$key]) ? $row[$key] : "";
                 }
-                
+
             }
             $s->fputcsv($cur);
         }

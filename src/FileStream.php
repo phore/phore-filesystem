@@ -27,14 +27,14 @@ class FileStream implements StreamInterface
      * @param string $mode
      * @throws FileAccessException
      */
-    public function __construct($file, string $mode, int $fileLock=null)
+    public function __construct($file, string $mode)
     {
         if (is_string($file))
             $file = new PhoreFile($file);
         if ( ! $file instanceof PhoreFile)
             throw new \InvalidArgumentException("Parameter 1 must be filename (string) or PhoreFile");
         $this->file = $file;
-        $this->fopen((string)$file, $mode, $fileLock);
+        $this->fopen((string)$file, $mode);
     }
 
 
@@ -44,15 +44,14 @@ class FileStream implements StreamInterface
     }
 
 
-    protected function fopen (string $filename, string $mode, int $fileLock=null) : FileStream
+    protected function fopen (string $filename, string $mode) : FileStream
     {
         $this->file = $filename;
         $this->res = fopen($filename, $mode);
-        
+
         if ( ! $this->res)
             throw new FileAccessException("fopen($this->file): " . error_get_last()["message"]);
-        if ($fileLock !== null)
-            flock($this->res, $fileLock);
+
         return $this;
     }
 
@@ -66,7 +65,7 @@ class FileStream implements StreamInterface
 
     public function datasync() : FileStream
     {
-        if ( ! fsync($this->res)) {
+        if ( ! fdatasync($this->res)) {
             throw new FileAccessException("Cannot fflush('$this->file'): " . error_get_last()["message"]);
         }
         return $this;
