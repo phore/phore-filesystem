@@ -210,6 +210,8 @@ class PhoreUri
     }
 
 
+
+
     /**
      * Returns true, if the path is a subpath of the path specified in parameter 1
      *
@@ -394,6 +396,15 @@ class PhoreUri
             $fileExtension = "." . $fileExtension;
 
         return new PhoreFile($this->uri . "/" . addslashes($filename) . $fileExtension);
+    }
+
+
+    public function withParentDir() : PhoreDirectory
+    {
+        $newUri = dirname($this->uri);
+        if ($newUri === ".")
+            $newUri = "/";
+        return new PhoreDirectory($newUri);
     }
 
 
