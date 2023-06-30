@@ -145,6 +145,26 @@ class PhoreDirectory extends PhoreUri
     }
 
 
+    /**
+     * List all Files in Folder
+     *
+     * @param string|null $filter
+     * @param bool $recursive
+     * @return array
+     */
+    public function listFiles(string $filter = null, bool $recursive = false) : array|\Iterator {
+        $this->validate();
+        $ret = [];
+        foreach($this->genWalk($filter, $recursive) as $path) {
+            if ( ! $path->isFile())
+                continue;
+            $ret[] = $path;
+            yield $path;
+        }
+        return $ret;
+    }
+
+
 
     /**
      * @return PhoreUri[]|string[]
@@ -166,7 +186,7 @@ class PhoreDirectory extends PhoreUri
                 return 0;
             return ((string)$a < (string)$b) ? -1 : 1;
         });
-        
+
         return $ret;
     }
 
