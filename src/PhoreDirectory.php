@@ -152,14 +152,13 @@ class PhoreDirectory extends PhoreUri
      * @param bool $recursive
      * @return array
      */
-    public function listFiles(string $filter = null, bool $recursive = false) : array|\Iterator {
+    public function listFiles(string $filter = null, bool $recursive = false) : array {
         $this->validate();
         $ret = [];
         foreach($this->genWalk($filter, $recursive) as $path) {
             if ( ! $path->isFile())
                 continue;
             $ret[] = $path;
-            yield $path;
         }
         return $ret;
     }
