@@ -73,7 +73,7 @@ class PhoreUri
      * @param string|null $suffix
      * @return string
      */
-    public function getBasename(string $suffix=null) : string
+    public function getBasename(string $suffix="") : string
     {
         return basename($this->uri, $suffix);
     }
