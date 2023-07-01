@@ -240,7 +240,7 @@ class PhoreFile extends PhoreUri
     /**
      *
      * @template T
-     * @param class-string<T> $cast
+     * @param class-string<T>|null $cast
      * @return array|T
      * @throws FileAccessException
      * @throws FileNotFoundException
@@ -277,9 +277,10 @@ class PhoreFile extends PhoreUri
      *
      * Requires phore/hydrator
      *
-     * @param string $className
+     * @template T
+     * @param class-string<T> $className
      * @param bool $strict
-     * @return array|bool|float|int|object|string|null
+     * @return array|bool|float|int|object|string|null|T
      * @throws FileNotFoundException
      * @throws FileParsingException
      * @throws \Phore\Hydrator\Ex\HydratorInputDataException
@@ -309,16 +310,17 @@ class PhoreFile extends PhoreUri
 
 
     /**
-     * @param null $content
+     * @template T
+     * @param class-string<T>|null $cast
      *
-     * @return $this|array
+     * @return array|T
      * @throws FileNotFoundException
      * @throws FileParsingException
      */
-    public function get_json() : array
+    public function get_json(string $cast = null) : mixed
     {
         try {
-            return phore_json_decode($this->get_contents());
+            return phore_json_decode($this->get_contents(), $cast);
         } catch (\InvalidArgumentException $e) {
             throw new FileParsingException(
                 "JSON Parsing of file '{$this->uri}' failed: " . $e->getMessage(), 0, $e
