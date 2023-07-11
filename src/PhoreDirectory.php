@@ -235,7 +235,8 @@ class PhoreDirectory extends PhoreUri
     public function copyTo(PhoreDirectory $targetDir) {
         $this->validate();
         $targetDir->validate();
-        $this->walkR(function (PhoreUri $uri) use ($targetDir) {
+        $uri = phore_dir($this->uri);
+        $uri->walkR(function (PhoreUri $uri) use ($targetDir) {
             $targetUri = $targetDir->withSubPath($uri->getRelPath());
             if ($uri->isFile()) {
                 $targetUri->asFile()->set_contents($uri->asFile()->get_contents());
