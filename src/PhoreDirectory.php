@@ -145,6 +145,25 @@ class PhoreDirectory extends PhoreUri
     }
 
 
+    /**
+     * List all Files in Folder
+     *
+     * @param string|null $filter
+     * @param bool $recursive
+     * @return array
+     */
+    public function listFiles(string $filter = null, bool $recursive = false) : array {
+        $this->validate();
+        $ret = [];
+        foreach($this->genWalk($filter, $recursive) as $path) {
+            if ( ! $path->isFile())
+                continue;
+            $ret[] = $path;
+        }
+        return $ret;
+    }
+
+
 
     /**
      * @return PhoreUri[]|string[]
@@ -166,7 +185,7 @@ class PhoreDirectory extends PhoreUri
                 return 0;
             return ((string)$a < (string)$b) ? -1 : 1;
         });
-        
+
         return $ret;
     }
 
@@ -226,5 +245,20 @@ class PhoreDirectory extends PhoreUri
         });
     }
     
+
+
+    public function copyTo(PhoreDirectory $targetDir) {
+        $this->validate();
+        $targetDir->validate();
+        $uri = phore_dir($this->uri);
+        $uri->walkR(function (PhoreUri $uri) use ($targetDir) {
+            $targetUri = $targetDir->withSubPath($uri->getRelPath());
+            if ($uri->isFile()) {
+                $targetUri->asFile()->set_contents($uri->asFile()->get_contents());
+            } else {
+                $targetUri->asDirectory()->mkdir();
+            }
+        });
+    }
 
 }
