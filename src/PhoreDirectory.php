@@ -211,5 +211,20 @@ class PhoreDirectory extends PhoreUri
             throw new FileNotFoundException("No file matching pattern '$regex' found in directory '$this'");
         return $found->asFile();
     }
+    
+    
+    public function copyTo(PhoreDirectory $targetDir) {
+        $this->validate();
+        $targetDir->validate();
+        $this->walkR(function (PhoreUri $uri) use ($targetDir) {
+            $targetUri = $targetDir->withSubPath($uri->getRelPath());
+            if ($uri->isFile()) {
+                $targetUri->asFile()->set_contents($uri->asFile()->get_contents());
+            } else {
+                $targetUri->asDirectory()->mkdir();
+            }
+        });
+    }
+    
 
 }
