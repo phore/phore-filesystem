@@ -246,4 +246,18 @@ class PhoreDirectory extends PhoreUri
         });
     }
 
+    public function moveTo(PhoreDirectory $targetDir) {
+        $this->validate();
+        $targetDir->validate();
+        $uri = phore_dir($this->uri);
+        $uri->walkR(function (PhoreUri $uri) use ($targetDir) {
+            $targetUri = $targetDir->withSubPath($uri->getRelPath());
+            if ($uri->isFile()) {
+                $targetUri->asFile()->set_contents($uri->asFile()->get_contents());
+                $uri->asFile()->unlink();
+            } else {
+                $targetUri->asDirectory()->mkdir();
+            }
+        });
+    }
 }
