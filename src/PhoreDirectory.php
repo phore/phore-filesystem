@@ -230,6 +230,9 @@ class PhoreDirectory extends PhoreUri
             throw new FileNotFoundException("No file matching pattern '$regex' found in directory '$this'");
         return $found->asFile();
     }
+    
+
+    
 
 
     public function copyTo(PhoreDirectory $targetDir) {
