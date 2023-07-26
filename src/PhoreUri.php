@@ -398,6 +398,30 @@ class PhoreUri
         return new PhoreFile($this->uri . "/" . addslashes($filename) . $fileExtension);
     }
 
+    /**
+     * Add a new File Extension or (if $replaceExistingExtension is true) replace the existing one.
+     * 
+     * Checks for valid file extensions (only alnum chars) and throws an exception if not valid.
+     * 
+     * @param string $fileExtension
+     * @param bool $replaceExistingExtension
+     * @param bool $strictChecks
+     * @return PhoreFile
+     */
+    public function withFileExtension(string $fileExtension, bool $replaceExistingExtension = false, bool $strictChecks = true) : PhoreFile {
+        if ($strictChecks && $fileExtension !== "" && ! ctype_alnum($fileExtension))
+            throw new \InvalidArgumentException("File extension '$fileExtension' must not contain special chars.");
+        if ($fileExtension !== "")
+            $fileExtension = "." . $fileExtension;
+        
+        $newUri = $this->uri;
+        if ($replaceExistingExtension) {
+            $newUri = preg_replace("/\.[a-z0-9]+$/i", "", $newUri);
+        }
+        return new PhoreFile($newUri . $fileExtension);
+        
+    }
+
 
     public function withParentDir() : PhoreDirectory
     {
