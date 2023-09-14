@@ -176,6 +176,14 @@ class PhoreFile extends PhoreUri
     }
 
 
+    public function chmod(int $mode) : self
+    {
+        $this->validate();
+        if ( ! chmod($this->uri, $mode))
+            throw new FilesystemException("Cannot chmod $this->uri to $mode");
+        return $this;
+    }
+    
     public function chown (string $owner) : self
     {
         $this->validate();
