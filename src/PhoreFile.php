@@ -125,6 +125,18 @@ class PhoreFile extends PhoreUri
 
     }
 
+    /**
+     * @param $destinationFile
+     * @return void
+     * @throws \Exception
+     */
+    public function copyTo($destinationFile) 
+    {
+        $this->validate();
+        $destinationFile = phore_file($destinationFile);
+        $this->streamCopyTo($destinationFile);
+    }
+
 
 
     /**
