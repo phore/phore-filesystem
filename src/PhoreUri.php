@@ -235,7 +235,7 @@ class PhoreUri
             if (!mkdir($concurrentDirectory = $this->uri, 0777, true) && !is_dir($concurrentDirectory)) {
                 throw new \RuntimeException(sprintf('Directory "%s" was not created', $concurrentDirectory));
             }
-            chomd($this->uri, 0777);
+            chmod($this->uri, 0777);
         }
         if (file_exists($this->uri) && is_dir($this->uri))
             return new PhoreDirectory($this->uri, $this->relPath);
