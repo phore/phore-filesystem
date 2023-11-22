@@ -150,7 +150,7 @@ class PhoreDirectory extends PhoreUri
      *
      * @param string|null $filter
      * @param bool $recursive
-     * @return array
+     * @return PhoreFile[]
      */
     public function listFiles(string $filter = null, bool $recursive = false) : array {
         $this->validate();
