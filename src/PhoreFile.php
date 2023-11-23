@@ -536,6 +536,15 @@ class PhoreFile extends PhoreUri
         $s->fclose();
     }
 
+    
+    public function get_csv(array $options = []) : array {
+        $ret = [];
+        foreach ($this->parseCsv($options) as $row) {
+            $ret[] = $row;
+        }
+        return $ret;
+    }
+    
     /**
      * Create a new tempoary file with the gunziped
      * contents.
