@@ -57,6 +57,18 @@ class PhoreUri
     }
 
     /**
+     * Remove multiple slashed and /./ 
+     * 
+     * @return PhoreUri
+     */
+    public function clean() : self {
+        $uri = $this->uri;
+        $uri = preg_replace("/\/+/", "/", $uri);
+        $uri = str_replace("/./", "/", $uri);
+        return new PhoreUri($uri);
+    }
+
+    /**
      * some/path/demo.inc.txt => some/path
      *
      * @return PhoreUri

@@ -103,6 +103,15 @@ class PhoreFile extends PhoreUri
         }
     }
 
+    /**
+     * @return array
+     * @throws FileAccessException
+     * @throws FileNotFoundException
+     */
+    public function get_contents_array() : array {
+        return explode("\n", $this->get_contents());
+    }
+
 
     /**
      * Copy on file streaming to the other
