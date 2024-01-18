@@ -21,9 +21,14 @@ class PhoreDirectory extends PhoreUri
     {
         $this->validate();
         if ( ! is_dir($this->uri)) {
-            if (!mkdir($concurrentDirectory = $this->uri, $createMask, true) && !is_dir($concurrentDirectory)) {
-                throw new \RuntimeException(sprintf('Directory "%s" was not created', $concurrentDirectory));
+            try {
+                if (!mkdir($concurrentDirectory = $this->uri, $createMask, true) && !is_dir($concurrentDirectory)) {
+                    throw new \RuntimeException(sprintf('Directory "%s" was not created', $concurrentDirectory));
+                }
+            } catch (\Error | \ErrorException $e) {
+                throw new FilesystemException("Cannot create directory '$this->uri': " . $e->getMessage());
             }
+
         }
         return $this;
     }
@@ -111,8 +116,10 @@ class PhoreDirectory extends PhoreUri
      * @throws Exception\PathOutOfBoundsException
      * @throws FileAccessException
      */
-    public function genWalk(string $filter = null, bool $recursive = false) : \Iterator
+    public function genWalk(string $filter = null, bool $recursive = false, int $recursionLimit = 999) : \Iterator
     {
+        if ($recursionLimit < 0)
+            return;
         $this->validate();
         $dirFp = opendir($this->uri);
         if (!$dirFp)
@@ -126,7 +133,7 @@ class PhoreDirectory extends PhoreUri
                 $path = $path->assertDirectory();
 
 
-                foreach ($path->genWalk($filter, $recursive) as $subPath) {
+                foreach ($path->genWalk($filter, $recursive, $recursionLimit-1) as $subPath) {
                     yield $subPath;
                 }
             }
@@ -158,11 +165,27 @@ class PhoreDirectory extends PhoreUri
         foreach($this->genWalk($filter, $recursive) as $path) {
             if ( ! $path->isFile())
                 continue;
-            $ret[] = $path;
+            $ret[] = $path->asFile();
         }
         return $ret;
     }
 
+    /**
+     * @param $filter
+     * @param bool $recursive
+     * @return PhoreUri[]
+     * @throws Exception\PathOutOfBoundsException
+     * @throws FileAccessException
+     */
+    public function list($filter=null, bool $recursive = false, int $recursionLimit = 999) : array
+    {
+        $this->validate();
+        $ret = [];
+        foreach($this->genWalk($filter, $recursive, $recursionLimit) as $path) {
+            $ret[] = $path;
+        }
+        return $ret;
+    }
 
 
     /**
@@ -230,9 +253,9 @@ class PhoreDirectory extends PhoreUri
             throw new FileNotFoundException("No file matching pattern '$regex' found in directory '$this'");
         return $found->asFile();
     }
-    
 
-    
+
+
 
 
     public function copyTo(PhoreDirectory $targetDir) {
