@@ -16,11 +16,12 @@ class PhoreTempFile extends PhoreFile
     /**
      * PhoreTempFile constructor.
      * @param string $prefix
+     * @param string $suffix    Provide e.g. extension by adding ".ext" - default empty
      * @throws FilesystemException
      */
-    public function __construct($prefix="")
+    public function __construct($prefix="", $suffix="")
     {
-        $name = tempnam(sys_get_temp_dir(), $prefix);
+        $name = tempnam(sys_get_temp_dir(), $prefix) . $suffix;
         if ($name === false)
             throw new FilesystemException("Can't create new tempoary file.");
         $this->unlinkOnClose();
