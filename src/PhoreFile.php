@@ -545,7 +545,22 @@ class PhoreFile extends PhoreUri
         $s->fclose();
     }
 
-    
+
+    /**
+     * Return array of ColumnName => Value
+     * 
+     * <example>
+     *    $data = phore_file("some.csv")->get_csv();
+     *    foreach ($data as $row) {
+     *       echo $row["col1"] . " ; ". $row["col2"]
+     *   }
+     * </example>
+     * 
+     * @param array $options
+     * @return array
+     * @throws FileAccessException
+     * @throws InvalidDataException
+     */
     public function get_csv(array $options = []) : array {
         $ret = [];
         foreach ($this->parseCsv($options) as $row) {
