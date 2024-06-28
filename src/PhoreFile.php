@@ -508,6 +508,7 @@ class PhoreFile extends PhoreUri
             "escape_char" => "\\",
             "skip_empty_lines" => true,
             "skip_invalid" => false,
+            "skip_start_char" => null,      // Skip lines starting with this char (e.g. "#")
             "bufSize" => 128000,
             "headerMap" => null
         ], $options);
@@ -523,6 +524,10 @@ class PhoreFile extends PhoreUri
         while ( ! $s->feof()) {
             $line++;
             $row = $s->freadcsv($o["bufSize"], $o["delimiter"], $o["enclosure"], $o["escape_char"]);
+            
+            if ($o["skip_start_char"] !== null && str_starts_with($row[0] ?? $o["skip_start_char"], $o["skip_start_char"]))
+                continue;
+            
             if ( ! is_array($row))
                 continue;
             if ($o["skip_empty_lines"] && count($row) === 1 && empty($row[0]))
