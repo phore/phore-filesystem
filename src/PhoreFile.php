@@ -507,7 +507,8 @@ class PhoreFile extends PhoreUri
             "enclosure" => '"',
             "escape_char" => "\\",
             "skip_empty_lines" => true,
-            "skip_invalid" => false,
+            "skip_invalid" => false,        // Skip lines with more or less columns than header
+            "strict" => true,               // Compare the number of columns with the header (if off it will try to parse as much as possible)
             "skip_start_char" => null,      // Skip lines starting with this char (e.g. "#")
             "bufSize" => 128000,
             "headerMap" => null
@@ -536,15 +537,18 @@ class PhoreFile extends PhoreUri
                 yield $row;
                 continue;
             }
-            if (count ($row) !== count($o["headerMap"])) {
+            if (count ($row) !== count($o["headerMap"]) && $o["strict"]) {
                 if ($o["skip_invalid"])
                     continue;
-                throw new InvalidDataException("Invalid csv data in '$this' on line $line: Expected " . count($o["headerMap"]) . " columns: '" . implode($o["delimiter"], $row) . "'");
+                throw new InvalidDataException("Invalid csv data in '$this' on line $line: Expected " . count($o["headerMap"]) . " columns: '" . implode($o["delimiter"], $row) . "' (strict mode on)");
             }
 
             $ret = [];
-            foreach ($row as $idx => $val)
+            foreach ($row as $idx => $val) {
+                if (!isset($o["headerMap"][$idx]))
+                    continue;
                 $ret[$o["headerMap"][$idx]] = $val;
+            }
             yield $ret;
         }
         $s->fclose();
