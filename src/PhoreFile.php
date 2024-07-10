@@ -139,7 +139,7 @@ class PhoreFile extends PhoreUri
      * @return void
      * @throws \Exception
      */
-    public function copyTo($destinationFile) 
+    public function copyTo($destinationFile)
     {
         $this->validate();
         $destinationFile = phore_file($destinationFile);
@@ -204,7 +204,7 @@ class PhoreFile extends PhoreUri
             throw new FilesystemException("Cannot chmod $this->uri to $mode");
         return $this;
     }
-    
+
     public function chown (string $owner) : self
     {
         $this->validate();
@@ -381,21 +381,38 @@ class PhoreFile extends PhoreUri
      * Dump all data in array to csv file. (Very slow!)
      *
      * @param array $data
+     * @param array|null $columns   Provide the columns to output. Us a map to rename the column Name. If null all columns will be outputted
      * @return $this
      * @throws FileAccessException
      */
-    public function set_csv(array $data) : self
+    public function set_csv(array $data, array $columns = null) : self
     {
         $this->validate();
         $keys = [];
-        foreach ($data as $val) {
-            foreach ($val as $key => $val)
-                $keys[$key] = true;
+        $columnNames = [];
+        if ($columns === null) {
+            foreach ($data as $val) {
+                foreach ($val as $key => $val)
+                    $keys[$key] = true;
+            }
+            $keys = array_keys($keys);
+            $columnNames = $keys;
+        } else {
+            foreach ($columns as $key => $value) {
+                if (is_int($key)) {
+                    $keys[] = $value;
+                    $columnNames[] = $value;
+                    continue;
+                }
+                $keys[] = $key;
+                $columnNames[] = $value;
+            }
         }
-        $keys = array_keys($keys);
+
+
 
         $s = $this->fopen("w");
-        $s->fputcsv($keys);
+        $s->fputcsv($columnNames);
         foreach ($data as $row) {
             $cur = [];
             foreach ($keys as $key) {
@@ -525,10 +542,10 @@ class PhoreFile extends PhoreUri
         while ( ! $s->feof()) {
             $line++;
             $row = $s->freadcsv($o["bufSize"], $o["delimiter"], $o["enclosure"], $o["escape_char"]);
-            
+
             if ($o["skip_start_char"] !== null && str_starts_with($row[0] ?? $o["skip_start_char"], $o["skip_start_char"]))
                 continue;
-            
+
             if ( ! is_array($row))
                 continue;
             if ($o["skip_empty_lines"] && count($row) === 1 && empty($row[0]))
@@ -557,14 +574,14 @@ class PhoreFile extends PhoreUri
 
     /**
      * Return array of ColumnName => Value
-     * 
+     *
      * <example>
      *    $data = phore_file("some.csv")->get_csv();
      *    foreach ($data as $row) {
      *       echo $row["col1"] . " ; ". $row["col2"]
      *   }
      * </example>
-     * 
+     *
      * @param array $options
      * @return array
      * @throws FileAccessException
@@ -577,7 +594,7 @@ class PhoreFile extends PhoreUri
         }
         return $ret;
     }
-    
+
     /**
      * Create a new tempoary file with the gunziped
      * contents.
