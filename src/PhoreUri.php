@@ -96,20 +96,7 @@ class PhoreUri
     {
         return basename($this->uri, $suffix);
     }
-
-    /**
-     * Returns the basename as PhoreUri
-     * @link https://php.net/manual/en/function.basename.php
-     * 
-     * 
-     * 
-     * @param string $suffix
-     * @return PhoreUri
-     */
-    public function getBasenameUri(string $suffix="") : PhoreUri
-    {
-        return new PhoreUri(basename($this->uri, $suffix));
-    }
+    
 
     /**
      * demo.inc.txt => txt
