@@ -57,8 +57,8 @@ class PhoreUri
     }
 
     /**
-     * Remove multiple slashed and /./ 
-     * 
+     * Remove multiple slashed and /./
+     *
      * @return PhoreUri
      */
     public function clean() : self {
@@ -80,7 +80,14 @@ class PhoreUri
 
 
     /**
-     * demo.inc.txt => demo.inc.txt
+     * Returns trailing name component of path
+     * @link https://php.net/manual/en/function.basename.php
+     *
+     * assert( phore_uri("some/path/demo.inc.txt")->getBasename() === "demo.inc.txt")
+     * assert( phore_uri("some/path/demo.inc.txt")->getBasename(".txt") === "demo.inc")
+     * assert( phore_uri("some/path/")->getBasename() === "path")
+     * assert( phore_uri("some/path/")->getBasename("/") === "")
+     *
      *
      * @param string|null $suffix
      * @return string
@@ -88,6 +95,20 @@ class PhoreUri
     public function getBasename(string $suffix="") : string
     {
         return basename($this->uri, $suffix);
+    }
+
+    /**
+     * Returns the basename as PhoreUri
+     * @link https://php.net/manual/en/function.basename.php
+     * 
+     * 
+     * 
+     * @param string $suffix
+     * @return PhoreUri
+     */
+    public function getBasenameUri(string $suffix="") : PhoreUri
+    {
+        return new PhoreUri(basename($this->uri, $suffix));
     }
 
     /**
@@ -413,9 +434,9 @@ class PhoreUri
 
     /**
      * Add a new File Extension or (if $replaceExistingExtension is true) replace the existing one.
-     * 
+     *
      * Checks for valid file extensions (only alnum chars) and throws an exception if not valid.
-     * 
+     *
      * @param string $fileExtension
      * @param bool $replaceExistingExtension
      * @param bool $strictChecks
@@ -426,13 +447,13 @@ class PhoreUri
             throw new \InvalidArgumentException("File extension '$fileExtension' must not contain special chars.");
         if ($fileExtension !== "")
             $fileExtension = "." . $fileExtension;
-        
+
         $newUri = $this->uri;
         if ($replaceExistingExtension) {
             $newUri = preg_replace("/\.[a-z0-9]+$/i", "", $newUri);
         }
         return new PhoreFile($newUri . $fileExtension);
-        
+
     }
 
 
