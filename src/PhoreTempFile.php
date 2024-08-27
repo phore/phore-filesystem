@@ -21,7 +21,7 @@ class PhoreTempFile extends PhoreFile
      */
     public function __construct($prefix="", $suffix="")
     {
-        $name = tempnam(sys_get_temp_dir(), $prefix) . $suffix;
+        $name = sys_get_temp_dir() . "/". uniqid($prefix) . $suffix;
         if ($name === false)
             throw new FilesystemException("Can't create new tempoary file.");
         $this->unlinkOnClose();
