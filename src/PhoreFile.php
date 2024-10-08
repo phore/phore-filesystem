@@ -139,10 +139,11 @@ class PhoreFile extends PhoreUri
      * @return void
      * @throws \Exception
      */
-    public function copyTo($destinationFile)
+    public function copyTo($destinationFile, bool $mkdir = true)
     {
         $this->validate();
         $destinationFile = phore_file($destinationFile);
+        $destinationFile->getDirname()->assertDirectory($mkdir);
         $this->streamCopyTo($destinationFile);
     }
 
