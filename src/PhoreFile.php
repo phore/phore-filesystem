@@ -363,16 +363,16 @@ class PhoreFile extends PhoreUri
      * @return $this|array
      * @throws FileParsingException
      */
-    public function set_json(array $data, bool $prettyPrint=false) : self
+    public function set_json(array|object $data, bool $prettyPrint=false) : self
     {
-        $this->set_contents(phore_json_encode($data, $prettyPrint));
+        $this->set_contents(phore_json_encode(phore_object_to_array($data), $prettyPrint));
         return $this;
     }
 
 
-    public function set_yaml(array $data) : self
+    public function set_yaml(array|object $data) : self
     {
-        $this->set_contents(phore_yaml_encode($data));
+        $this->set_contents(phore_yaml_encode(phore_object_to_array($data)));
         return $this;
     }
 
