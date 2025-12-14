@@ -264,9 +264,16 @@ class PhoreUri
 
 
 
-    public function assertFile () : PhoreFile
+    public function assertFile (bool $createIfNotExisting=false) : PhoreFile
     {
         $this->validate();
+        if (is_dir($this->uri))
+            throw new FilesystemException("Uri '$this->uri' is a directory, not a file.");
+
+        if ($createIfNotExisting === true && ! file_exists($this->uri)) {
+            $this->getDirname()->assertDirectory(true);
+            touch($this->uri);
+        }
         if (file_exists($this->uri) && is_file($this->uri))
             return new PhoreFile($this->uri, $this->relPath);
         throw new FilesystemException("Uri '$this->uri' is not a valid file.");
