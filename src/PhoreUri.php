@@ -30,7 +30,7 @@ class PhoreUri
      */
     protected $relPath = null;
 
-    public function __construct(string $uri, array $__relPath=null)
+    public function __construct(string $uri, ?array $__relPath=null)
     {
         $this->uri = $uri;
         $this->validate();
@@ -38,7 +38,7 @@ class PhoreUri
     }
 
 
-    public function validate(string $optFileName = null)
+    public function validate(?string $optFileName = null)
     {
         if (strpos($this->uri, "\0") !== false) {
             throw new \Exception("Null-byte character detected in uri.");
@@ -376,7 +376,7 @@ class PhoreUri
      * @param null $cwd
      * @return PhoreUri
      */
-    public function abs(string $cwd=null) : PhoreUri
+    public function abs(?string $cwd=null) : PhoreUri
     {
         if ($cwd === null)
             $cwd = getcwd();

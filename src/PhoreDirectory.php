@@ -68,7 +68,7 @@ class PhoreDirectory extends PhoreUri
     }
 
 
-    public function walk(callable $fn, string $filter=null) : bool
+    public function walk(callable $fn, ?string $filter=null) : bool
     {
         $this->validate();
         $dirFp = opendir($this->uri);
@@ -98,7 +98,7 @@ class PhoreDirectory extends PhoreUri
         return true;
     }
 
-    public function walkR(callable $fn, string $filter=null) : bool
+    public function walkR(callable $fn, ?string $filter=null) : bool
     {
         $this->validate();
         return $this->walk(function (PhoreUri $uri) use ($fn, $filter) {
@@ -116,7 +116,7 @@ class PhoreDirectory extends PhoreUri
      * @throws Exception\PathOutOfBoundsException
      * @throws FileAccessException
      */
-    public function genWalk(string $filter = null, bool $recursive = false, int $recursionLimit = 999) : \Iterator
+    public function genWalk(?string $filter = null, bool $recursive = false, int $recursionLimit = 999) : \Iterator
     {
         if ($recursionLimit < 0)
             return;
@@ -159,7 +159,7 @@ class PhoreDirectory extends PhoreUri
      * @param bool $recursive
      * @return PhoreFile[]
      */
-    public function listFiles(string $filter = null, bool $recursive = false) : array {
+    public function listFiles(?string $filter = null, bool $recursive = false) : array {
         $this->validate();
         $ret = [];
         foreach($this->genWalk($filter, $recursive) as $path) {
@@ -192,7 +192,7 @@ class PhoreDirectory extends PhoreUri
      * @return PhoreUri[]|string[]
      * @throws FileAccessException
      */
-    public function getListSorted(string $filter=null, bool $recursive = false, bool $returnRelPathAsString=false) : array
+    public function getListSorted(?string $filter=null, bool $recursive = false, bool $returnRelPathAsString=false) : array
     {
         $this->validate();
         $ret = [];

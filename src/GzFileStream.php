@@ -45,7 +45,7 @@ class GzFileStream extends FileStream
             throw new FileAccessException("Cannot get fread('$this->file'): " . error_get_last()["message"]);
         return $data;
     }
-    public function fgets (int $length=null) 
+    public function fgets (?int $length=null) 
     {
         if (false === ($data = @gzgets($this->res, $length)) && ! @feof($this->res))
             throw new FileAccessException("Cannot get fgets('$this->file'): " . error_get_last()["message"]);

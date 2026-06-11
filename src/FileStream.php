@@ -90,7 +90,7 @@ class FileStream implements StreamInterface
         return $data;
     }
 
-    public function fgets (int $length=null)
+    public function fgets (?int $length=null)
     {
         if ($length !== null) {
             if (false === ($data = @fgets($this->res, $length)) && ! @feof($this->res))
@@ -190,7 +190,7 @@ class FileStream implements StreamInterface
      * @param int $chunkSize
      * @throws FileAccessException
      */
-    public function passthru(callable $callback = null, int $chunkSize=8192)
+    public function passthru(?callable $callback = null, int $chunkSize=8192)
     {
         while ( ! feof($this->res)) {
             $buf = fread($this->res, $chunkSize);

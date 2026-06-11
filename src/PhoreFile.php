@@ -118,7 +118,7 @@ class PhoreFile extends PhoreUri
      *
      * @param PhoreFile $target
      */
-    public function streamCopyTo($destinationFile, int $maxlen=null)
+    public function streamCopyTo($destinationFile, ?int $maxlen=null)
     {
         $this->validate();
         $destinationFile = phore_file($destinationFile);
@@ -276,7 +276,7 @@ class PhoreFile extends PhoreUri
      * @throws FileNotFoundException
      * @throws FileParsingException
      */
-    public function get_yaml(string $cast=null)
+    public function get_yaml(?string $cast=null)
     {
         try {
             $textData = $this->get_contents();
@@ -347,7 +347,7 @@ class PhoreFile extends PhoreUri
      * @throws FileNotFoundException
      * @throws FileParsingException
      */
-    public function get_json(string $cast = null) : mixed
+    public function get_json(?string $cast = null) : mixed
     {
         try {
             return phore_json_decode($this->get_contents(), $cast);
@@ -386,7 +386,7 @@ class PhoreFile extends PhoreUri
      * @return $this
      * @throws FileAccessException
      */
-    public function set_csv(array $data, array $columns = null) : self
+    public function set_csv(array $data, ?array $columns = null) : self
     {
         $this->validate();
         $keys = [];
