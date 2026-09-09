@@ -11,6 +11,7 @@ namespace Phore\FileSystem;
 
 use mysql_xdevapi\Exception;
 use Phore\Core\Exception\InvalidDataException;
+use Phore\Core\Exception\YamlDecodeException;
 use Phore\FileSystem\Exception\FileAccessException;
 use Phore\FileSystem\Exception\FileNotFoundException;
 use Phore\FileSystem\Exception\FileParsingException;
@@ -418,14 +419,20 @@ class PhoreFile extends PhoreUri
 
         try {
             $header = trim($yaml) === '' ? [] : phore_yaml_decode($yaml);
-        } catch (\InvalidArgumentException $e) {
-            $yamlLine = 1;
-            if (preg_match('/\bline\s+(\d+)\b/i', $e->getMessage(), $lineMatch)) {
-                $yamlLine = (int) $lineMatch[1];
+        } catch (YamlDecodeException $e) {
+            $fileLine = ($e->getErrorLine() ?? 1) + 1;
+            $location = "line {$fileLine}";
+            if ($e->getErrorColumn() !== null) {
+                $location .= ", column {$e->getErrorColumn()}";
             }
-            $fileLine = $yamlLine + 1;
             throw new FileParsingException(
-                "Front matter YAML parsing of file '{$filename}' failed on line {$fileLine}: {$e->getMessage()}",
+                "Front matter YAML parsing of file '{$filename}' failed on {$location}: {$e->getMessage()}",
+                0,
+                $e
+            );
+        } catch (\InvalidArgumentException $e) {
+            throw new FileParsingException(
+                "Front matter YAML parsing of file '{$filename}' failed on line 2: {$e->getMessage()}",
                 0,
                 $e
             );

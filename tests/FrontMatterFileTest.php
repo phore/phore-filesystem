@@ -2,6 +2,7 @@
 
 namespace Test;
 
+use Phore\Core\Exception\YamlDecodeException;
 use Phore\FileSystem\Exception\FileParsingException;
 use Phore\FileSystem\FrontMatterFile;
 use Phore\FileSystem\PhoreTempFile;
@@ -96,7 +97,7 @@ class FrontMatterFileTest extends TestCase
     public function testYamlParserErrorReportsFilenameAndSourceLine(): void
     {
         $file = new PhoreTempFile();
-        $file->set_contents("---\ntitle: valid\nbroken: key: value\n---\nBody");
+        $file->set_contents("---\ntitle: valid\n\tbroken: value\n---\nBody");
 
         try {
             $file->get_front_matter();
@@ -104,6 +105,11 @@ class FrontMatterFileTest extends TestCase
         } catch (FileParsingException $e) {
             $this->assertStringContainsString($file->getUri(), $e->getMessage());
             $this->assertStringContainsString('line 3', $e->getMessage());
+            $this->assertStringContainsString('column 1', $e->getMessage());
+            $this->assertInstanceOf(YamlDecodeException::class, $e->getPrevious());
+            $this->assertSame(2, $e->getPrevious()->getErrorLine());
+            $this->assertSame(1, $e->getPrevious()->getErrorColumn());
+            $this->assertSame("\tbroken: value", $e->getPrevious()->getErrorSourceLine());
         }
     }
 
