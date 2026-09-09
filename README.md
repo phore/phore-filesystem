@@ -51,6 +51,31 @@ phore_uri("/tmp")->assertIsFile()->assertIsWritable();
 phore_uri("/tmp/somefile.yml")->assertFile()->get_yaml();
 ```
 
+## Front matter files
+
+Jekyll-style YAML front matter can be read together with the remaining content:
+
+```php
+$document = phore_file("post.md")->get_front_matter();
+echo $document->header["title"];
+echo $document->content;
+```
+
+Pass a class name to hydrate the header when `phore/hydrator` is installed:
+
+```php
+$document = phore_file("post.md")->get_front_matter(PostHeader::class);
+echo $document->header->title;
+```
+
+Create or replace a front matter file with `put_front_matter()`:
+
+```php
+phore_file("post.md")->put_front_matter(
+    new \Phore\FileSystem\FrontMatterFile(null, ["title" => "Example"], "Content")
+);
+```
+
 
 ## Tempoary Files
 

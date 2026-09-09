@@ -379,6 +379,99 @@ class PhoreFile extends PhoreUri
 
 
     /**
+     * Read a Jekyll-style front matter file.
+     *
+     * @template T of object
+     * @param class-string<T>|null $cast
+     * @return FrontMatterFile<array|T>
+     * @throws FileNotFoundException
+     * @throws FileParsingException
+     */
+    public function get_front_matter(?string $cast = null) : FrontMatterFile
+    {
+        $contents = $this->get_contents();
+        $filename = $this->getUri();
+
+        if ( ! preg_match('/\A---\r?\n/', $contents)) {
+            throw new FileParsingException(
+                "Front matter parsing of file '{$filename}' failed on line 1: Expected opening delimiter '---'."
+            );
+        }
+
+        if ( ! preg_match(
+            '/\A---\r?\n(?<header>.*?)(?<delimiter>^---[ \t]*\r?$(?:\n|\z))(?<content>.*)\z/ms',
+            $contents,
+            $matches
+        )) {
+            $line = substr_count($contents, "\n") + 1;
+            throw new FileParsingException(
+                "Front matter parsing of file '{$filename}' failed on line {$line}: Expected closing delimiter '---'."
+            );
+        }
+
+        $yaml = $matches['header'];
+        if (str_ends_with($yaml, "\r\n")) {
+            $yaml = substr($yaml, 0, -2);
+        } elseif (str_ends_with($yaml, "\n")) {
+            $yaml = substr($yaml, 0, -1);
+        }
+
+        try {
+            $header = trim($yaml) === '' ? [] : phore_yaml_decode($yaml);
+        } catch (\InvalidArgumentException $e) {
+            $yamlLine = 1;
+            if (preg_match('/\bline\s+(\d+)\b/i', $e->getMessage(), $lineMatch)) {
+                $yamlLine = (int) $lineMatch[1];
+            }
+            $fileLine = $yamlLine + 1;
+            throw new FileParsingException(
+                "Front matter YAML parsing of file '{$filename}' failed on line {$fileLine}: {$e->getMessage()}",
+                0,
+                $e
+            );
+        }
+
+        if ($cast !== null) {
+            if ( ! function_exists('phore_hydrate')) {
+                throw new \InvalidArgumentException(
+                    'Package phore/hydrator is required but not installed to hydrate front matter'
+                );
+            }
+
+            try {
+                $header = phore_hydrate($header, $cast);
+            } catch (\Exception $e) {
+                throw new FileParsingException(
+                    "Hydration of front matter in file '{$filename}' failed: {$e->getMessage()}",
+                    0,
+                    $e
+                );
+            }
+        }
+
+        return new FrontMatterFile($filename, $header, $matches['content']);
+    }
+
+
+    /**
+     * Write a Jekyll-style front matter file.
+     */
+    public function put_front_matter(FrontMatterFile $frontMatterFile) : self
+    {
+        $header = phore_object_to_array($frontMatterFile->header);
+        $yaml = $header === [] ? '' : rtrim(phore_yaml_encode($header), "\r\n");
+
+        $contents = "---\n";
+        if ($yaml !== '') {
+            $contents .= $yaml . "\n";
+        }
+        $contents .= "---\n" . $frontMatterFile->content;
+
+        return $this->set_contents($contents);
+    }
+
+
+    /**
      * Dump all data in array to csv file. (Very slow!)
      *
      * @param array $data
