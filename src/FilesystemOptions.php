@@ -185,6 +185,11 @@ final class FilesystemOptions
         if (preg_match('/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//', $rootDir)) {
             throw new InvalidFilesystemOptionsException("rootDir must not use a stream or URI scheme.");
         }
+        if (in_array('..', explode('/', $rootDir), true)) {
+            throw new InvalidFilesystemOptionsException(
+                "rootDir must not contain '..' segments because they can hide symlink traversal."
+            );
+        }
 
         if (!str_starts_with($rootDir, '/')) {
             $cwd = getcwd();
