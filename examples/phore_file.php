@@ -2,70 +2,50 @@
 
 require __DIR__ . '/../vendor/autoload.php';
 
-$root = phore_dir('/tmp/phore-filesystem-file-' . getmypid() . '-' . bin2hex(random_bytes(4)));
-$root->rmDir(true)->mkdir();
+// Das Temp-Verzeichnis wird automatisch aufgeraeumt; Fehler bleiben unveraendert sichtbar.
+$root = new \Phore\FileSystem\PhoreTempDir();
+$dir = $root->withSubPath('data')->assertDirectory(true);
 
-try {
-    $dir = phore_dir((string)$root . '/data')->mkdir();
+// Normalfall: direkt schreiben und lesen, ohne exists(), Vorab-Guards oder try/catch.
+// Die Dateioperationen uebernehmen Zugriffspruefung, Locking und Fehlerdiagnose.
+$file = $dir->withFileName('demo', 'txt')->set_contents("A\n")->append_content('B');
+$text = $file->get_contents();
+assert($text === "A\nB");
 
-    // Wechselt von phore_dir zu phore_file und schreibt Text.
-    // set_contents(), append_content() und get_contents() arbeiten intern mit File-Locking.
-    $file = $dir->withFileName('demo', 'txt')->set_contents("A\n")->append_content('B');
+$dirA = $file->withDirName();
+$dirB = $file->getDirname()->asDirectory();
+$basename = $file->getBasename();
+$filename = $file->getFilename();
+$extension = $file->getExtension();
+$logFile = $file->withFileExtension('log', true)->set_contents('log');
 
-    // Wechselt von phore_file zurück zum Verzeichnis.
-    $dirA = $file->withDirName();
-    $dirB = $file->getDirname()->asDirectory();
+// mkdir()/createPath() bereiten Elternverzeichnisse vor, set_contents() legt Dateien an.
+$appFile = $root->withSubPath('logs/app.txt')->asFile()->createPath()->touch()->set_contents("a\nb\nc");
+$lines = $appFile->get_contents_array();
+$tail = $appFile->tail(1);
+$size = $appFile->getFilesize();
+$copy = $root->withSubPath('copy/app.txt')->asFile();
+$appFile->copyTo($copy);
+$renamed = $root->withSubPath('copy/app-renamed.txt')->asFile();
+$copy->rename((string) $renamed);
+$renamed->unlink();
 
-    // Liest Dateiname, Basename und Extension.
-    $basename = $file->getBasename();
-    $filename = $file->getFilename();
-    $extension = $file->getExtension();
+// JSON/YAML nicht selbst lesen und parsen: Formatfehler erhalten Dateikontext von Phore.
+$jsonFile = $root->withSubPath('data/demo.json')->asFile()->set_json(['hello' => 'json'], true);
+$yamlFile = $root->withSubPath('data/demo.yml')->asFile()->set_yaml(['hello' => 'yaml']);
+$json = $jsonFile->get_json();
+$yaml = $yamlFile->get_yaml();
 
-    // Ersetzt die Dateiendung.
-    $logFile = $file->withFileExtension('log', true)->set_contents('log');
+// assert*() ist fuer eine eigenstaendige Voraussetzung gedacht, nicht vor jedem Lesen.
+// Hier wird das nach der Kopie erwartete Verzeichnis explizit verlangt.
+$copy->getDirname()->assertDirectory();
 
-    // Nutzt createPath(), touch(), get_contents_array(), tail(), copyTo(), rename() und unlink().
-    // Auch diese High-Level-Methoden bauen auf dem normalen File-Zugriff mit Locking auf.
-    $appFile = phore_file((string)$root . '/logs/app.txt')->createPath()->touch()->set_contents("a\nb\nc");
-    $lines = $appFile->get_contents_array();
-    $tail = $appFile->tail(1);
-    $copy = phore_file((string)$root . '/copy/app.txt');
-    $appFile->copyTo($copy);
-    $renamed = phore_file((string)$root . '/copy/app-renamed.txt');
-    $copy->rename((string)$renamed);
-    $renamed->unlink();
+// Erwartete Beispielwerte, keine vorgeschaltete Datei-Pruefschicht.
+assert((string) $dirA === (string) $dir && (string) $dirB === (string) $dir);
+assert($basename === 'demo.txt' && $filename === 'demo' && $extension === 'txt');
+assert($logFile->getBasename() === 'demo.log');
+assert($lines === ['a', 'b', 'c'] && $tail === 'c' && $size === 5);
+assert(!$renamed->exists());
+assert($json === ['hello' => 'json'] && $yaml === ['hello' => 'yaml']);
 
-    // Prüft Dateistatus und Größe.
-    $exists = $appFile->exists();
-    $isFile = $appFile->isFile();
-    $size = $appFile->getFilesize();
-
-    // Nutzt phore_uri() für generisches Path-Building sowie JSON und YAML.
-    $json = phore_uri((string)$root)->withSubPath('data/demo.json')->assertFile(true)->set_json(['hello' => 'json'], true)->get_json();
-    $yaml = phore_uri((string)$root)->join('data', 'demo.yml')->assertFile(true)->set_yaml(['hello' => 'yaml'])->get_yaml();
-
-    if (
-        $file->get_contents() !== "A\nB" ||
-        (string)$dirA !== (string)$dir ||
-        (string)$dirB !== (string)$dir ||
-        $basename !== 'demo.txt' ||
-        $filename !== 'demo' ||
-        $extension !== 'txt' ||
-        $logFile->getBasename() !== 'demo.log' ||
-        $lines !== ['a', 'b', 'c'] ||
-        $tail !== 'c' ||
-        !$exists ||
-        !$isFile ||
-        $size !== 5 ||
-        !$copy->getDirname()->isDirectory() ||
-        $renamed->exists() ||
-        $json !== ['hello' => 'json'] ||
-        $yaml !== ['hello' => 'yaml']
-    ) {
-        throw new RuntimeException('Unexpected file result');
-    }
-
-    echo "ok\n";
-} finally {
-    $root->rmDir(true);
-}
+echo "ok\n";
