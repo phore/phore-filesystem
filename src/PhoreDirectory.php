@@ -115,13 +115,17 @@ class PhoreDirectory extends PhoreUri
     }
 
     /**
-     * Visits direct entries that match the optional basename filter.
+     * Besucht direkte Verzeichniseinträge, optional gefiltert nach Basename.
      *
-     * The callback returning false stops the walk normally. Policy and access
-     * failures remain exceptions and are never converted into this stop signal.
+     * Gibt der Callback false zurück, endet der Walk kontrolliert mit false.
+     * Security- oder Zugriffsfehler bleiben Exceptions und werden nicht als Stop-Signal
+     * verschluckt. Die Einträge werden vor Anwendung des Filters autorisiert.
      *
+     * @param callable(PhoreUri): (bool|mixed) $fn Callback pro Eintrag.
+     * @param string|null $filter Optionales fnmatch()-Muster.
+     * @return bool true bei vollständigem Lauf, false bei Callback-Abbruch.
      * @see self::genWalk()
-     * @example $dir->walk(static fn(PhoreUri $entry) => true);
+     * @example $completed = $dir->walk(static fn(PhoreUri $entry) => true); assert($completed === true);
      */
     public function walk(callable $fn, ?string $filter = null): bool
     {
@@ -135,13 +139,17 @@ class PhoreDirectory extends PhoreUri
     }
 
     /**
-     * Visits regular files recursively through the common traversal core.
+     * Besucht reguläre Dateien rekursiv über den gemeinsamen Traversierungskern.
      *
-     * Directory names are never filtered before recursion, so a file filter
-     * cannot hide a directory or a filesystem policy violation.
+     * Verzeichnisnamen werden nicht vor der Rekursion gefiltert; dadurch kann ein
+     * Dateifilter weder Verzeichnisse noch darin liegende Policy-Verstöße verstecken.
+     * Callback false beendet die Traversierung kontrolliert.
      *
+     * @param callable(PhoreFile): (bool|mixed) $fn Callback pro regulärer Datei.
+     * @param string|null $filter Optionales fnmatch()-Muster für Dateinamen.
+     * @return bool true bei vollständigem Lauf, false bei Callback-Abbruch.
      * @see self::genWalk()
-     * @example $dir->walkR(static fn(PhoreUri $file) => true, '*.md');
+     * @example $completed = $dir->walkR(static fn(PhoreFile $file) => true, '*.md'); assert($completed === true);
      */
     public function walkR(callable $fn, ?string $filter = null): bool
     {
@@ -158,18 +166,20 @@ class PhoreDirectory extends PhoreUri
     }
 
     /**
-     * Iterates directory entries using the bound filesystem restrictions.
+     * Iteriert Verzeichniseinträge unter den gebundenen Filesystem-Restrictions.
      *
-     * Files are yielded as PhoreFile, directories as PhoreDirectory. Recursive
-     * traversal is child-first for directories and does not promise global
-     * ordering. The basename filter affects yielded entries only, never whether
-     * a directory is inspected.
+     * Dateien werden als PhoreFile, Verzeichnisse als PhoreDirectory geliefert.
+     * Bei Rekursion werden Symlink-Ziele, Root-Grenzen, unterstützte Dateitypen,
+     * Cycle-Erkennung und recursionLimit geprüft, bevor ein Filter Ergebnisse ausblendet.
      *
-     * @return \Iterator<int, PhoreUri>
-     * @throws FileAccessException
-     * @throws FilesystemException
+     * @param string|null $filter Optionales fnmatch()-Muster für ausgegebene Einträge.
+     * @param bool $recursive Unterverzeichnisse rekursiv traversieren.
+     * @param int $recursionLimit Maximale zusätzliche Rekursionstiefe.
+     * @return \Iterator<int, PhoreUri> Autorisierte Einträge.
+     * @throws FileAccessException Wenn ein Verzeichnis nicht gelesen werden kann.
+     * @throws FilesystemException Bei Traversierungs- oder Policy-Fehlern.
      * @see self::listFiles()
-     * @example foreach ($dir->genWalk('*.md', true) as $entry) { echo $entry; }
+     * @example $entries = iterator_to_array($dir->genWalk('*.md', true)); assert(is_array($entries));
      */
     public function genWalk(
         ?string $filter = null,
@@ -193,18 +203,21 @@ class PhoreDirectory extends PhoreUri
     }
 
     /**
-     * Returns regular files, optionally globally sorted by relative path.
+     * Liefert reguläre Dateien, optional rekursiv und global nach relativem Pfad sortiert.
      *
-     * sort='path' materializes the full result and orders it with strcmp()
-     * against slash-separated paths relative to this directory. The returned
-     * PhoreFile objects preserve rootDir and every inherited restriction.
+     * sort='path' materialisiert die Treffer und sortiert mit strcmp() auf den
+     * slash-separierten Pfaden relativ zu diesem Verzeichnis. Alle zurückgegebenen
+     * PhoreFile-Objekte behalten rootDir und die übrigen geerbten Restrictions.
      *
-     * @param 'path'|null $sort
-     * @return list<PhoreFile>
-     * @throws FilesystemException
+     * @param string|null $filter Optionales fnmatch()-Muster für Dateinamen.
+     * @param bool $recursive Unterverzeichnisse rekursiv durchsuchen.
+     * @param int $recursionLimit Maximale Rekursionstiefe.
+     * @param 'path'|null $sort Optionale globale Pfadsortierung.
+     * @return list<PhoreFile> Gefundene reguläre Dateien.
+     * @throws FilesystemException Bei Traversierungs- oder Policy-Fehlern.
      * @see self::genWalk()
      * @see PhoreUri::getRelPath()
-     * @example $dir->listFiles('*.md', recursive: true, sort: 'path');
+     * @example $files = $dir->listFiles('*.md', recursive: true, sort: 'path'); assert(array_is_list($files));
      */
     public function listFiles(
         ?string $filter = null,
@@ -237,10 +250,18 @@ class PhoreDirectory extends PhoreUri
     }
 
     /**
-     * @return list<PhoreUri>
-     * @throws FilesystemException
+     * Materialisiert genWalk() als Liste von Dateien und Verzeichnissen.
+     *
+     * Filter, Rekursion und Security-Verhalten entsprechen genWalk(); insbesondere
+     * werden Einträge autorisiert, bevor ein Filter sie aus dem Ergebnis entfernen kann.
+     *
+     * @param string|null $filter Optionales fnmatch()-Muster.
+     * @param bool $recursive Unterverzeichnisse rekursiv traversieren.
+     * @param int $recursionLimit Maximale Rekursionstiefe.
+     * @return list<PhoreUri> Autorisierte Einträge.
+     * @throws FilesystemException Bei Traversierungs- oder Policy-Fehlern.
      * @see self::genWalk()
-     * @example $entries = $dir->list(recursive: true);
+     * @example $entries = $dir->list(recursive: true); assert(array_is_list($entries));
      */
     public function list(
         $filter = null,
@@ -254,15 +275,19 @@ class PhoreDirectory extends PhoreUri
     }
 
     /**
-     * Returns a globally path-sorted listing.
+     * Liefert eine global nach relativem Pfad sortierte Verzeichnisliste.
      *
-     * String output is a data projection only and carries no filesystem
-     * restrictions. Keep PhoreUri objects when later file access is required.
+     * Mit returnRelPathAsString=true werden nur Strings zurückgegeben. Diese Strings
+     * tragen keinen FilesystemContext; für spätere sichere Dateizugriffe sind deshalb
+     * die PhoreUri-Objekte aus dem Standardmodus vorzuziehen.
      *
-     * @return list<PhoreUri|string>
-     * @throws FilesystemException
+     * @param string|null $filter Optionales fnmatch()-Muster.
+     * @param bool $recursive Unterverzeichnisse rekursiv traversieren.
+     * @param bool $returnRelPathAsString Relative Pfade statt PhoreUri-Objekten zurückgeben.
+     * @return list<PhoreUri|string> Sortierte Einträge oder relative Pfade.
+     * @throws FilesystemException Bei Traversierungs- oder Policy-Fehlern.
      * @see self::genWalk()
-     * @example $paths = $dir->getListSorted('*.md', true, true);
+     * @example $paths = $dir->getListSorted('*.md', true, true); assert(array_is_list($paths));
      */
     public function getListSorted(
         ?string $filter = null,

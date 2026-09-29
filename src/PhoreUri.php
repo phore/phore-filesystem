@@ -32,25 +32,21 @@ class PhoreUri
     protected FilesystemContext $filesystemContext;
 
     /**
-     * Creates a URI and binds its filesystem restrictions.
+     * Erzeugt einen URI und bindet die Filesystem-Restrictions an das Objekt.
      *
-     * Security: A PhoreUri input inherits its complete context. options=null
-     * and [] therefore never reset a root or another restriction. A string is
-     * a new trusted entry point and receives the documented defaults.
+     * Wird ein bestehendes PhoreUri übergeben, werden dessen Restrictions vollständig
+     * geerbt; null oder [] setzen sie nicht zurück. Ein String ist ein neuer Entry-Point
+     * mit den Defaults followSymlinks=true, allowHardLinks=true und ohne rootDir.
+     * Bei gesetzter rootDir dürfen auch aufgelöste Symlink-Ziele diese Root nicht verlassen.
      *
-     * @param string|PhoreUri $uri Path or already bound Phore object.
-     * @param string[]|null $__relPath Internal relative-path history.
-     * @param array{
-     *   rootDir?: string|null,
-     *   followSymlinks?: bool,
-     *   allowHardLinks?: bool,
-     *   requireAtomicContainment?: bool
-     * }|FilesystemOptions|null $options
-     * @param FilesystemContext|null $__context Internal inherited context.
-     * @param string|null $__accessPath Internal already resolved access path.
-     * @throws FilesystemException
+     * @param string|PhoreUri $uri Pfad oder bereits gebundenes Phore-Objekt.
+     * @param string[]|null $__relPath Interne relative Pfadhistorie.
+     * @param array{rootDir?: string|null, followSymlinks?: bool, allowHardLinks?: bool, requireAtomicContainment?: bool}|FilesystemOptions|null $options Filesystem-Policy.
+     * @param FilesystemContext|null $__context Interner geerbter Context.
+     * @param string|null $__accessPath Interner bereits aufgelöster Zugriffspfad.
+     * @throws FilesystemException Bei ungültigem Pfad oder Policy-Verstoß.
      * @see FilesystemOptions::fromAssoc()
-     * @example phore_uri('/srv/site/docs', options: ['rootDir' => '/srv/site/docs']);
+     * @example $uri = phore_uri('/srv/site/docs', options: ['rootDir' => '/srv/site/docs']); assert($uri->getFilesystemOptions()->rootDir === '/srv/site/docs');
      */
     public function __construct(
         string|PhoreUri $uri,
@@ -109,14 +105,17 @@ class PhoreUri
     }
 
     /**
-     * Returns the inherited relative path or a path relative to an explicit base.
+     * Liefert den geerbten relativen Pfad oder berechnet ihn zu einer expliziten Basis.
      *
-     * The optional base changes representation only. It never changes rootDir,
-     * the resolved access path or another filesystem restriction.
+     * Eine explizite Basis verändert weder den Zugriffspfad noch die Security-Policy.
+     * Die Prüfung ist lexikalisch auf den autorisierten accessPath bezogen; ein Pfad
+     * außerhalb der Basis wird abgewiesen.
      *
-     * @throws PathOutOfBoundsException
+     * @param PhoreDirectory|null $base Optionale Basis für die relative Darstellung.
+     * @return string|null Relativer Pfad, "." bei identischem Pfad oder null ohne Historie.
+     * @throws PathOutOfBoundsException Wenn der Pfad nicht unterhalb der Basis liegt.
      * @see PhoreDirectory::listFiles()
-     * @example $file->getRelPath($root);
+     * @example $file = phore_file('/srv/app/docs/a.md'); assert($file->getRelPath(phore_dir('/srv/app')) === 'docs/a.md');
      */
     public function getRelPath(?PhoreDirectory $base = null): ?string
     {
@@ -188,10 +187,15 @@ class PhoreUri
     }
 
     /**
-     * Remove duplicate slashes and dot segments while preserving restrictions.
+     * Normalisiert doppelte Slashes sowie "."- und ".."-Segmente in der Darstellung.
      *
+     * Die gebundenen Filesystem-Restrictions bleiben erhalten. clean() ist keine
+     * Möglichkeit, Root- oder Symlink-Prüfungen zu umgehen; der normalisierte
+     * Zugriffspfad wird beim erzeugten Objekt erneut über den Context abgeleitet.
+     *
+     * @return self Normalisiertes Objekt desselben Typs.
      * @see self::withSubPath()
-     * @example phore_uri('/tmp//a/./b')->clean();
+     * @example assert((string) phore_uri('/tmp//a/./b')->clean() === '/tmp/a/b');
      */
     public function clean(): self
     {
@@ -344,14 +348,18 @@ class PhoreUri
     }
 
     /**
-     * Validates a local relative path and returns its normalized representation.
+     * Validiert und normalisiert einen lokalen relativen Pfad.
      *
-     * This assertion is a path-shape check. The bound filesystem context still
-     * performs root and link authorization when the path is derived or used.
+     * Absolute Pfade, NUL-Bytes, Backslashes und URI-Schemes werden abgewiesen.
+     * ".." darf nur bereits hinzugefügte Segmente innerhalb des relativen Pfades
+     * zurücknehmen. Diese Methode prüft die Pfadform; Root- und Symlink-Policies
+     * werden zusätzlich bei der tatsächlichen Ableitung beziehungsweise Operation geprüft.
      *
-     * @throws PathOutOfBoundsException
+     * @param string $path Zu prüfender relativer Pfad.
+     * @return string Normalisierte slash-separierte Darstellung.
+     * @throws PathOutOfBoundsException Bei ungültigem oder ausbrechendem relativen Pfad.
      * @see self::withSubPath()
-     * @example $root->assertRelativePath('pages/index.md');
+     * @example assert($root->assertRelativePath('pages/./docs/../index.md') === 'pages/index.md');
      */
     public function assertRelativePath(string $path): string
     {
@@ -586,11 +594,16 @@ class PhoreUri
     }
 
     /**
-     * Returns a same-type object with symlink following disabled.
+     * Liefert dasselbe Objekt mit explizit deaktiviertem Symlink-Following.
      *
-     * @throws FilesystemPolicyViolationException
+     * followSymlinks ist standardmäßig true. Mit dieser Methode wird die Policy
+     * für das Objekt und alle daraus abgeleiteten Objekte auf false verschärft.
+     * Eine geerbte No-Symlink-Policy kann später nicht wieder gelockert werden.
+     *
+     * @return static Objekt desselben Typs mit followSymlinks=false.
+     * @throws FilesystemPolicyViolationException Wenn die Ableitung eine andere Policy verletzt.
      * @see FilesystemOptions
-     * @example $safe = $file->assertNoSymlinks();
+     * @example $safe = phore_file('/srv/app/config.php')->assertNoSymlinks(); assert($safe->getFilesystemOptions()->followSymlinks === false);
      */
     public function assertNoSymlinks(): static
     {
@@ -607,11 +620,16 @@ class PhoreUri
     }
 
     /**
-     * Checks a prospective file target without creating it.
+     * Prüft ein zukünftiges Dateiziel, ohne Datei oder Parent-Verzeichnisse anzulegen.
      *
-     * @throws FilesystemException
+     * Das Ziel darf kein Verzeichnis sein; eine bestehende Datei muss schreibbar sein
+     * und der letzte existierende Parent muss ein schreibbares Verzeichnis sein.
+     * Root-, Symlink- und weitere Policies werden vor diesen Prüfungen angewendet.
+     *
+     * @return PhoreFile Geprüftes Ziel als Dateiobjekt.
+     * @throws FilesystemException Bei ungültigem oder nicht erlaubtem Ziel.
      * @see PhoreFile::set_contents()
-     * @example $root->withSubPath('output/file.txt')->assertFileTarget();
+     * @example $target = $root->withSubPath('output/file.txt')->assertFileTarget(); assert($target->exists() === false);
      */
     public function assertFileTarget(): PhoreFile
     {
