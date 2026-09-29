@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Phore\FileSystem;
 
 use Phore\FileSystem\Exception\FileAccessException;
@@ -183,7 +185,7 @@ class FileStream implements StreamInterface
         return $this->res;
     }
 
-    public function __toString()
+    public function __toString(): string
     {
         try {
             if ($this->isSeekable()) {
@@ -196,7 +198,7 @@ class FileStream implements StreamInterface
         }
     }
 
-    public function seek($offset, $whence = SEEK_SET)
+    public function seek($offset, $whence = SEEK_SET): void
     {
         if (fseek($this->res, $offset, $whence) !== 0) {
             throw new \RuntimeException(
@@ -205,7 +207,7 @@ class FileStream implements StreamInterface
         }
     }
 
-    public function fstat()
+    public function fstat(): array
     {
         $stat = fstat($this->res);
         if ($stat === false) {
@@ -217,7 +219,7 @@ class FileStream implements StreamInterface
         return $stat;
     }
 
-    public function truncate(int $size)
+    public function truncate(int $size): void
     {
         if (!ftruncate($this->res, $size)) {
             $message = error_get_last()['message'] ?? 'unknown error';
@@ -227,7 +229,7 @@ class FileStream implements StreamInterface
         }
     }
 
-    public function passthru(?callable $callback = null, int $chunkSize = 8192)
+    public function passthru(?callable $callback = null, int $chunkSize = 8192): void
     {
         while (!feof($this->res)) {
             $buf = fread($this->res, $chunkSize);
@@ -245,7 +247,7 @@ class FileStream implements StreamInterface
         }
     }
 
-    public function close()
+    public function close(): void
     {
         $this->fclose();
     }
@@ -259,12 +261,12 @@ class FileStream implements StreamInterface
         return $resource;
     }
 
-    public function getSize()
+    public function getSize(): ?int
     {
         return $this->fstat()['size'];
     }
 
-    public function tell()
+    public function tell(): int
     {
         $position = ftell($this->res);
         if ($position === false) {
@@ -276,48 +278,48 @@ class FileStream implements StreamInterface
         return $position;
     }
 
-    public function eof()
+    public function eof(): bool
     {
         return $this->feof();
     }
 
-    public function isSeekable()
+    public function isSeekable(): bool
     {
         return (bool) ($this->getMetadata('seekable') ?? false);
     }
 
-    public function rewind()
+    public function rewind(): void
     {
         $this->seek(0);
     }
 
-    public function isWritable()
+    public function isWritable(): bool
     {
         $mode = (string) ($this->getMetadata('mode') ?? '');
 
         return strpbrk($mode, 'waxc+') !== false;
     }
 
-    public function write($string)
+    public function write($string): int
     {
         $this->fwrite($string, $bytesWritten);
 
         return $bytesWritten;
     }
 
-    public function isReadable()
+    public function isReadable(): bool
     {
         $mode = (string) ($this->getMetadata('mode') ?? '');
 
         return strpbrk($mode, 'r+') !== false;
     }
 
-    public function read($length)
+    public function read($length): string
     {
         return $this->fread($length);
     }
 
-    public function getContents()
+    public function getContents(): string
     {
         $contents = stream_get_contents($this->res);
         if ($contents === false) {
@@ -329,7 +331,7 @@ class FileStream implements StreamInterface
         return $contents;
     }
 
-    public function getMetadata($key = null)
+    public function getMetadata($key = null): mixed
     {
         $metadata = stream_get_meta_data($this->res);
         if ($key !== null) {

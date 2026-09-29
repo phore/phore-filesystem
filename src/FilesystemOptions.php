@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Phore\FileSystem;
 
 use Phore\FileSystem\Exception\InvalidFilesystemOptionsException;

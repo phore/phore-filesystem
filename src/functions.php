@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use Phore\FileSystem\FilesystemOptions;
 use Phore\FileSystem\PhoreDirectory;
 use Phore\FileSystem\PhoreFile;
