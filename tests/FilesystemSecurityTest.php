@@ -249,6 +249,25 @@ class FilesystemSecurityTest extends TestCase
         FilesystemOptions::fromAssoc(['followSymlinks' => 'false']);
     }
 
+    public function testRootDirRejectsParentSegmentsBeforeNormalization(): void
+    {
+        $this->expectException(InvalidFilesystemOptionsException::class);
+        FilesystemOptions::fromAssoc(['rootDir' => '/srv/site/link/../docs']);
+    }
+
+    public function testFileExtensionCannotInjectPathSegmentsEvenWithStrictChecksDisabled(): void
+    {
+        $base = new PhoreTempDir();
+        $allowed = $base->withSubPath('allowed')->assertDirectory(true);
+        $file = phore_file(
+            $allowed->withSubPath('page.md'),
+            ['rootDir' => (string) $allowed]
+        );
+
+        $this->expectException(\InvalidArgumentException::class);
+        $file->withFileExtension('../secret', strictChecks: false);
+    }
+
     public function testStreamCloseReturnsFileWithSameRestrictions(): void
     {
         $base = new PhoreTempDir();
