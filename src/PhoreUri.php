@@ -562,6 +562,16 @@ class PhoreUri
         bool $replaceExistingExtension = false,
         bool $strictChecks = true
     ): PhoreFile {
+        if (
+            str_contains($fileExtension, '/')
+            || str_contains($fileExtension, '\\')
+            || str_contains($fileExtension, "\0")
+        ) {
+            throw new \InvalidArgumentException(
+                "File extension must not contain path separators or NUL."
+            );
+        }
+
         if ($strictChecks && $fileExtension !== '' && !ctype_alnum($fileExtension)) {
             throw new \InvalidArgumentException(
                 "File extension '$fileExtension' must not contain special chars."
