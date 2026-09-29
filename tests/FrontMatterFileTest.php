@@ -113,6 +113,48 @@ class FrontMatterFileTest extends TestCase
         }
     }
 
+    public function testOptionalFrontMatterReturnsNullWhenHeaderIsMissing(): void
+    {
+        $file = new PhoreTempFile();
+        $file->set_contents("Plain markdown\n");
+
+        $this->assertNull($file->get_front_matter(required: false));
+    }
+
+    public function testUnchangedFrontMatterRendersByteIdentically(): void
+    {
+        $file = new PhoreTempFile();
+        $source = "---\r\ntitle: Example\r\n---\r\nBody\r\n";
+        $file->set_contents($source);
+
+        $frontMatter = $file->get_front_matter();
+
+        $this->assertSame($source, $frontMatter->render());
+    }
+
+    public function testModifiedFrontMatterCanBeRenderedWithoutWriting(): void
+    {
+        $file = new PhoreTempFile();
+        $file->set_contents("---\ntitle: Example\n---\nBody\n");
+
+        $frontMatter = $file->get_front_matter();
+        $frontMatter->header['title'] = 'Changed';
+
+        $rendered = $frontMatter->render();
+
+        $this->assertStringContainsString('title: Changed', $rendered);
+        $this->assertSame("---\ntitle: Example\n---\nBody\n", $file->get_contents());
+    }
+
+    public function testUnsafePhpObjectYamlTagIsRejected(): void
+    {
+        $file = new PhoreTempFile();
+        $file->set_contents("---\npayload: !php/object O:8:\"stdClass\":0:{}\n---\nBody\n");
+
+        $this->expectException(FileParsingException::class);
+        $file->get_front_matter();
+    }
+
     public function testCastsHeaderWhenHydratorIsAvailable(): void
     {
         if ( ! function_exists('phore_hydrate')) {

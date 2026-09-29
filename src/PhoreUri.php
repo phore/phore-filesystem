@@ -1,467 +1,712 @@
 <?php
-/**
- * Created by PhpStorm.
- * User: matthes
- * Date: 17.07.18
- * Time: 14:04
- */
 
 namespace Phore\FileSystem;
-
 
 use Phore\FileSystem\Exception\FileAccessException;
 use Phore\FileSystem\Exception\FileNotFoundException;
 use Phore\FileSystem\Exception\FilesystemException;
+use Phore\FileSystem\Exception\FilesystemPolicyViolationException;
 use Phore\FileSystem\Exception\PathOutOfBoundsException;
 
 class PhoreUri
 {
-
-    protected $uri;
+    /**
+     * Display path returned by getUri() and __toString().
+     */
+    protected string $uri;
 
     /**
-     * The Relative path
-     *
-     * Only set if this path was generatet by genWalk() or by calling withSubPath()
-     *
-     * Will contain the full name without leading slash
+     * Absolute path used for filesystem operations.
+     */
+    protected string $accessPath;
+
+    /**
+     * Relative derivation history used by legacy walk/list APIs.
      *
      * @var string[]|null
      */
-    protected $relPath = null;
+    protected ?array $relPath = null;
 
-    public function __construct(string $uri, ?array $__relPath=null)
-    {
+    protected FilesystemContext $filesystemContext;
+
+    /**
+     * Creates a URI and binds its filesystem restrictions.
+     *
+     * Security: A PhoreUri input inherits its complete context. options=null
+     * and [] therefore never reset a root or another restriction. A string is
+     * a new trusted entry point and receives the documented defaults.
+     *
+     * @param string|PhoreUri $uri Path or already bound Phore object.
+     * @param string[]|null $__relPath Internal relative-path history.
+     * @param array{
+     *   rootDir?: string|null,
+     *   followSymlinks?: bool,
+     *   allowHardLinks?: bool,
+     *   requireAtomicContainment?: bool
+     * }|FilesystemOptions|null $options
+     * @param FilesystemContext|null $__context Internal inherited context.
+     * @param string|null $__accessPath Internal already resolved access path.
+     * @throws FilesystemException
+     * @see FilesystemOptions::fromAssoc()
+     * @example phore_uri('/srv/site/docs', options: ['rootDir' => '/srv/site/docs']);
+     */
+    public function __construct(
+        string|PhoreUri $uri,
+        ?array $__relPath = null,
+        array|FilesystemOptions|null $options = null,
+        ?FilesystemContext $__context = null,
+        ?string $__accessPath = null
+    ) {
+        if ($uri instanceof PhoreUri) {
+            $this->uri = $uri->uri;
+            $this->accessPath = $uri->accessPath;
+            $this->relPath = $__relPath ?? $uri->relPath;
+            $this->filesystemContext = $uri->filesystemContext->derive($this->accessPath, $options);
+            $this->validate();
+
+            return;
+        }
+
         $this->uri = $uri;
-        $this->validate();
         $this->relPath = $__relPath;
-    }
 
-
-    public function validate(?string $optFileName = null)
-    {
-        if (strpos($this->uri, "\0") !== false) {
-            throw new \Exception("Null-byte character detected in uri.");
+        if ($__context === null) {
+            $this->filesystemContext = FilesystemContext::create($options);
+            $this->accessPath = $__accessPath
+                ?? $this->filesystemContext->resolveInputPath($uri);
+        } else {
+            $candidatePath = $__accessPath
+                ?? $__context->resolveInputPath($uri);
+            $this->filesystemContext = $__context->derive($candidatePath, $options);
+            $this->accessPath = $candidatePath;
         }
-        if ($optFileName !== null && strpos($optFileName, "\0") !== false) {
-            throw new \Exception("Null-byte character detected in uri.(parameter 1)");
+
+        $this->validate();
+    }
+
+    public function validate(?string $optFileName = null): void
+    {
+        if (str_contains($this->uri, "\0")) {
+            throw new FilesystemException("Null-byte character detected in uri '{$this->uri}'.");
+        }
+        if ($optFileName !== null && str_contains($optFileName, "\0")) {
+            throw new FilesystemException("Null-byte character detected in uri '$optFileName'.");
         }
     }
 
-
-    public function getRelPath() : ?string
+    /**
+     * Returns the inherited relative path or a path relative to an explicit base.
+     *
+     * The optional base changes representation only. It never changes rootDir,
+     * the resolved access path or another filesystem restriction.
+     *
+     * @throws PathOutOfBoundsException
+     * @see PhoreDirectory::listFiles()
+     * @example $file->getRelPath($root);
+     */
+    public function getRelPath(?PhoreDirectory $base = null): ?string
     {
-        if ($this->relPath === null)
-            return null;
-        return implode("/", $this->relPath);
+        if ($base === null) {
+            return $this->relPath === null ? null : implode('/', $this->relPath);
+        }
+
+        $basePath = rtrim($base->accessPath, '/');
+        $path = rtrim($this->accessPath, '/');
+
+        if ($path === $basePath) {
+            return '.';
+        }
+        if (!FilesystemContext::isWithin($path, $basePath)) {
+            throw new PathOutOfBoundsException(
+                "Path '{$this->uri}' is not below relative-path base '{$base->getUri()}'."
+            );
+        }
+
+        return ltrim(substr($path, strlen($basePath)), '/');
     }
 
     /**
-     * Remove multiple slashed and /./
-     *
-     * @return PhoreUri
+     * Returns the immutable options snapshot currently bound to this object.
      */
-    public function clean() : self {
-        $uri = $this->uri;
-        $uri = preg_replace("/\/+/", "/", $uri);
-        $uri = str_replace("/./", "/", $uri);
-        return new PhoreUri($uri);
-    }
-
-    /**
-     * some/path/demo.inc.txt => some/path
-     *
-     * @return PhoreUri
-     */
-    public function getDirname () : self
+    public function getFilesystemOptions(): FilesystemOptions
     {
-        return new self(dirname($this->uri));
+        return $this->filesystemContext->getOptions();
     }
 
+    /**
+     * Internal path authorization hook for streams and filesystem operations.
+     *
+     * @internal
+     */
+    public function getFilesystemPathForOperation(
+        string $operation,
+        bool $allowMissingLeaf = true
+    ): string {
+        return $this->filesystemContext->assertAccess(
+            $this->accessPath,
+            $operation,
+            $allowMissingLeaf
+        );
+    }
 
     /**
-     * Returns trailing name component of path
-     * @link https://php.net/manual/en/function.basename.php
-     *
-     * assert( phore_uri("some/path/demo.inc.txt")->getBasename() === "demo.inc.txt")
-     * assert( phore_uri("some/path/demo.inc.txt")->getBasename(".txt") === "demo.inc")
-     * assert( phore_uri("some/path/")->getBasename() === "path")
-     * assert( phore_uri("some/path/")->getBasename("/") === "")
-     *
-     *
-     * @param string|null $suffix
-     * @return string
+     * @internal
      */
-    public function getBasename(string $suffix="") : string
+    public function assertRawResourceExportAllowed(): void
+    {
+        $this->filesystemContext->assertRawResourceExportAllowed();
+    }
+
+    /**
+     * @internal
+     */
+    public function assertExternalProcessAllowed(string $operation): void
+    {
+        $this->filesystemContext->assertExternalProcessAllowed($operation);
+    }
+
+    /**
+     * Remove duplicate slashes and dot segments while preserving restrictions.
+     *
+     * @see self::withSubPath()
+     * @example phore_uri('/tmp//a/./b')->clean();
+     */
+    public function clean(): self
+    {
+        $display = self::normalizeDisplayPath($this->uri);
+        $access = FilesystemContext::normalizeAbsolutePath($this->accessPath);
+
+        return $this->spawn(static::class, $display, $access, $this->relPath);
+    }
+
+    public function getDirname(): self
+    {
+        return $this->spawn(
+            PhoreUri::class,
+            dirname($this->uri),
+            dirname($this->accessPath),
+            $this->parentRelPath()
+        );
+    }
+
+    public function getBasename(string $suffix = ''): string
     {
         return basename($this->uri, $suffix);
     }
-    
 
-    /**
-     * demo.inc.txt => txt
-     *
-     * @return string
-     */
-    public function getExtension() : string
+    public function getExtension(): string
     {
         return pathinfo($this->uri, PATHINFO_EXTENSION);
     }
 
-    /**
-     *
-     * demo.inc.txt => demo.inc
-     *
-     * @return string
-     */
-    public function getFilename () : string
+    public function getFilename(): string
     {
         return pathinfo($this->uri, PATHINFO_FILENAME);
     }
 
-    public function withDirName() : PhoreDirectory
+    public function withDirName(): PhoreDirectory
     {
-        return new PhoreDirectory(dirname($this->uri));
+        return $this->spawn(
+            PhoreDirectory::class,
+            dirname($this->uri),
+            dirname($this->accessPath),
+            $this->parentRelPath()
+        );
     }
 
-
-    public function withSubPath (string $subpath) : PhoreUri
+    public function withSubPath(string $subpath): PhoreUri
     {
-        $parts = explode("/", $subpath);
-        $ret = [];
+        $relative = $this->assertRelativePath($subpath);
+        $displayBase = $this instanceof PhoreFile ? dirname($this->uri) : $this->uri;
+        $accessBase = $this instanceof PhoreFile ? dirname($this->accessPath) : $this->accessPath;
+        $access = $this->filesystemContext->resolveRelative($accessBase, $subpath);
+        $display = self::joinDisplayPath($displayBase, $relative);
 
-        $relPath = $this->relPath;
-        if ($relPath === null)
-            $relPath = [];
-
-        foreach ($parts as $part) {
-            if ($part == "")
-                continue;
-            if ($part == "." || $part == "")
-                continue;
-            if ($part == "..") {
-                if (count ($ret) == 0)
-                    throw new PathOutOfBoundsException("SubPath is out of bounds: $subpath");
-                array_pop($ret);
-                continue;
+        $relPath = $this->relPath ?? [];
+        foreach (explode('/', $relative) as $part) {
+            if ($part !== '') {
+                $relPath[] = $part;
             }
-            $ret[] = $part;
-            $relPath[] = $part;
-        }
-        $startUri = $this->uri;
-        if ($this instanceof PhoreFile) {
-            $startUri = dirname($startUri);
         }
 
-        return new PhoreUri($startUri .= "/" . implode("/", $ret), $relPath);
+        return $this->spawn(PhoreUri::class, $display, $access, $relPath);
     }
 
-    public function withRelativePath (string $relpath) : PhoreUri
+    public function withRelativePath(string $relpath): PhoreUri
     {
-        $startUri = $this->uri;
-        if ($this instanceof PhoreFile) {
-            $startUri = dirname($startUri);
-        }
-        $prefix = "";
-        if (substr($startUri, 0, 1) === "/")
-            $prefix = "/"; // Absolute path
-
-        $parts = explode("/", $startUri . "/"  . $relpath);
-        $ret = [];
-        foreach ($parts as $part) {
-            if ($part == "")
-                continue;
-            if ($part == "." || $part == "")
-                continue;
-            if ($part == "..") {
-                if (count ($ret) == 0)
-                    throw new PathOutOfBoundsException("SubPath is out of bounds: $relpath");
-                array_pop($ret);
-                continue;
-            }
-            $ret[] = $part;
+        if ($relpath === '') {
+            throw new PathOutOfBoundsException('Relative path must not be empty.');
         }
 
-        return new PhoreUri($prefix . implode("/", $ret), $ret);
+        $displayBase = $this instanceof PhoreFile ? dirname($this->uri) : $this->uri;
+        $accessBase = $this instanceof PhoreFile ? dirname($this->accessPath) : $this->accessPath;
+        $access = $this->filesystemContext->resolveRelative($accessBase, $relpath);
+        $display = self::normalizeDisplayPath(rtrim($displayBase, '/') . '/' . $relpath);
+
+        return $this->spawn(PhoreUri::class, $display, $access, null);
     }
-
 
     /**
-     * Validate uri against fnmatch() pattern
+     * Validates a local relative path and returns its normalized representation.
      *
-     * Parameter 1 can be string or array of patterns.
+     * This assertion is a path-shape check. The bound filesystem context still
+     * performs root and link authorization when the path is derived or used.
      *
-     * Returns true if any of the patterns match - otherwise false is returned
-     *
-     * <example>
-     *   phore_uri()->fnmatch("*.php")
-     *   phore_uri()->fnmatch(["*.php", "*.js"]);
-     * </example>
-     *
-     * @param string|string[] $patterns
-     * @param int $flags
-     * @return bool
+     * @throws PathOutOfBoundsException
+     * @see self::withSubPath()
+     * @example $root->assertRelativePath('pages/index.md');
      */
-    public function fnmatch ($patterns, int $flags=0) : bool
+    public function assertRelativePath(string $path): string
     {
-        if ( ! is_array($patterns))
-            $patterns = [ $patterns ];
-        foreach ($patterns as $pattern) {
-            if (fnmatch($pattern, (string)$this, $flags))
-                return true;
+        if (
+            $path === ''
+            || str_starts_with($path, '/')
+            || str_contains($path, "\0")
+            || str_contains($path, '\\')
+            || preg_match('/^[a-zA-Z][a-zA-Z0-9+.-]*:/', $path)
+        ) {
+            throw new PathOutOfBoundsException("Invalid relative path '$path'.");
         }
+
+        $parts = [];
+        foreach (explode('/', $path) as $part) {
+            if ($part === '' || $part === '.') {
+                continue;
+            }
+            if ($part === '..') {
+                if ($parts === []) {
+                    throw new PathOutOfBoundsException("Relative path escapes its start directory: '$path'.");
+                }
+                array_pop($parts);
+                continue;
+            }
+            $parts[] = $part;
+        }
+
+        if ($parts === []) {
+            throw new PathOutOfBoundsException("Relative path resolves to an empty path: '$path'.");
+        }
+
+        return implode('/', $parts);
+    }
+
+    public function fnmatch($patterns, int $flags = 0): bool
+    {
+        if (!is_array($patterns)) {
+            $patterns = [$patterns];
+        }
+        foreach ($patterns as $pattern) {
+            if (fnmatch($pattern, (string) $this, $flags)) {
+                return true;
+            }
+        }
+
         return false;
     }
 
-
-    public function isDirectory () : bool
+    public function isDirectory(): bool
     {
-        return file_exists($this->uri) && is_dir($this->uri);
+        $path = $this->filesystemContext->assertAccess($this->accessPath, 'isDirectory', true);
+
+        return is_dir($path);
     }
 
-    public function isFile () : bool
+    public function isFile(): bool
     {
-        return file_exists($this->uri) && is_file($this->uri);
+        $path = $this->filesystemContext->assertAccess($this->accessPath, 'isFile', true);
+
+        return is_file($path);
     }
 
-    public function exists() : bool
+    public function exists(): bool
     {
-        return file_exists($this->uri);
+        $path = $this->filesystemContext->assertAccess($this->accessPath, 'exists', true);
+
+        return file_exists($path) || is_link($path);
     }
 
+    public function isSubpathOf($path): bool
+    {
+        $candidate = self::normalizeDisplayPath((string) $this);
+        $root = self::normalizeDisplayPath((string) $path);
 
+        return $candidate === $root || str_starts_with($candidate, rtrim($root, '/') . '/');
+    }
 
+    public function assertDirectory(bool $createIfNotExisting = false): PhoreDirectory
+    {
+        $directory = $this->asDirectory();
+
+        if ($createIfNotExisting && !$directory->exists()) {
+            $directory->mkdir();
+        }
+
+        $path = $directory->getFilesystemPathForOperation('assertDirectory', false);
+        if (!is_dir($path)) {
+            throw new FilesystemException("Uri '{$this->uri}' is not a valid directory.");
+        }
+
+        return $directory;
+    }
+
+    public function assertFile(bool $createIfNotExisting = false): PhoreFile
+    {
+        $file = $this->asFile();
+
+        if ($file->isDirectory()) {
+            throw new FilesystemException("Uri '{$this->uri}' is a directory, not a file.");
+        }
+
+        if ($createIfNotExisting && !$file->exists()) {
+            $file->getDirname()->assertDirectory(true);
+            $file->touch();
+        }
+
+        $path = $file->getFilesystemPathForOperation('assertFile', false);
+        if (!is_file($path)) {
+            throw new FilesystemException("Uri '{$this->uri}' is not a valid file.");
+        }
+
+        return $file;
+    }
+
+    public function assertReadable(): self
+    {
+        $path = $this->getFilesystemPathForOperation('assertReadable', false);
+        if (!is_readable($path)) {
+            throw new FileAccessException("Uri '{$this->uri}' is not readable.");
+        }
+
+        return $this;
+    }
+
+    public function assertWritable(): self
+    {
+        $path = $this->getFilesystemPathForOperation('assertWritable', false);
+        if (!is_writable($path)) {
+            throw new FileAccessException("Uri '{$this->uri}' is not writable.");
+        }
+
+        return $this;
+    }
 
     /**
-     * Returns true, if the path is a subpath of the path specified in parameter 1
+     * Returns a same-type object with symlink following disabled.
      *
-     * <example>
-     *  assert(phore_uri("/some/path")->isSubpathOf("/some") === true)
-     * </example>
-     *
-     * @param $path
-     * @return bool
+     * @throws FilesystemPolicyViolationException
+     * @see FilesystemOptions
+     * @example $safe = $file->assertNoSymlinks();
      */
-    public function isSubpathOf($path) : bool
+    public function assertNoSymlinks(): static
     {
-        return startsWith((string)$this, (string)$path);
+        /** @var static $result */
+        $result = $this->spawn(
+            static::class,
+            $this->uri,
+            $this->accessPath,
+            $this->relPath,
+            ['followSymlinks' => false]
+        );
+
+        return $result;
     }
 
-
-    public function assertDirectory (bool $createIfNotExisting=false) : PhoreDirectory
+    /**
+     * Checks a prospective file target without creating it.
+     *
+     * @throws FilesystemException
+     * @see PhoreFile::set_contents()
+     * @example $root->withSubPath('output/file.txt')->assertFileTarget();
+     */
+    public function assertFileTarget(): PhoreFile
     {
-        $this->validate();
-        if ($createIfNotExisting === true && ! file_exists($this->uri)) {
-            if (!mkdir($concurrentDirectory = $this->uri, 0777, true) && !is_dir($concurrentDirectory)) {
-                throw new \RuntimeException(sprintf('Directory "%s" was not created', $concurrentDirectory));
+        $file = $this->asFile();
+        $path = $file->getFilesystemPathForOperation('assertFileTarget', true);
+
+        if (is_dir($path)) {
+            throw new FilesystemException("File target '{$file->getUri()}' is a directory.");
+        }
+        if (file_exists($path) && !is_writable($path)) {
+            throw new FileAccessException("File target '{$file->getUri()}' is not writable.");
+        }
+
+        $parent = dirname($path);
+        while (!file_exists($parent)) {
+            $next = dirname($parent);
+            if ($next === $parent) {
+                break;
             }
-            chmod($this->uri, 0777);
+            $parent = $next;
         }
-        if (file_exists($this->uri) && is_dir($this->uri))
-            return new PhoreDirectory($this->uri, $this->relPath);
-        throw new FilesystemException("Uri '$this->uri' is not a valid directory.");
-    }
 
-
-
-    public function assertFile (bool $createIfNotExisting=false) : PhoreFile
-    {
-        $this->validate();
-        if (is_dir($this->uri))
-            throw new FilesystemException("Uri '$this->uri' is a directory, not a file.");
-
-        if ($createIfNotExisting === true && ! file_exists($this->uri)) {
-            $this->getDirname()->assertDirectory(true);
-            touch($this->uri);
+        $file->filesystemContext->assertAccess($parent, 'assertFileTarget parent', false);
+        if (!is_dir($parent) || !is_writable($parent)) {
+            throw new FileAccessException(
+                "Parent directory '$parent' for file target '{$file->getUri()}' is not writable."
+            );
         }
-        if (file_exists($this->uri) && is_file($this->uri))
-            return new PhoreFile($this->uri, $this->relPath);
-        throw new FilesystemException("Uri '$this->uri' is not a valid file.");
+
+        return $file;
     }
 
-    public function assertReadable () : self
+    public function getUri(): string
     {
         $this->validate();
-        if ( ! is_readable($this->uri))
-            throw new FileAccessException("Uri '$this->uri' is not readable");
-        return $this;
-    }
 
-    public function assertWritable () : self
-    {
-        $this->validate();
-        if ( ! is_writable($this->uri))
-            throw new FileAccessException("Uri '$this->uri' is not writable");
-        return $this;
-    }
-
-
-    public function getUri() : string
-    {
-        $this->validate();
         return $this->uri;
     }
-
 
     public function __toString()
     {
-        $this->validate();
         return $this->uri;
     }
 
-    public function asFile() : PhoreFile
+    public function asFile(): PhoreFile
     {
-        $this->validate();
-        return new PhoreFile($this->uri, $this->relPath);
+        return $this->spawn(PhoreFile::class, $this->uri, $this->accessPath, $this->relPath);
     }
 
-
-    /**
-     * Join path
-     *
-     * <example>
-     *  phore_uri("/some/path/").join("sub", "file.txt") === "/some/path/sub/file.txt"
-     * </example>
-     *
-     * @param mixed ...$elements
-     * @return PhoreUri
-     */
-    public function join(...$elements) : PhoreUri
-    {
-        $newUri = $this->uri;
-        if (endsWith($newUri, "/"))
-            $newUri = substr($newUri, 0, -1);
-        foreach ($elements as $element) {
-            if (startsWith($element, "/"))
-                $element = substr($element, 1);
-            $newUri .= "/$element";
-        }
-        return new PhoreUri($newUri);
-    }
-
-
-    /**
-     * Securely join a path with each element as
-     * a directory.
-     *
-     * @param ...$elements
-     * @return PhoreUri
-     */
-    public function join_secure(...$elements) : PhoreUri
+    public function join(...$elements): PhoreUri
     {
         $path = $this;
         foreach ($elements as $element) {
-            if ($element === "." || $element === "..")
-                throw new \InvalidArgumentException("Path security violation: path must not contain '.' or '..'");
-
-            $element = urlencode($element);
-            if (strlen($element) === 0)
-                throw new \InvalidArgumentException("Path must not contain empty string element");
-            $path = $path->join($element);
+            $element = ltrim((string) $element, '/');
+            $path = $path->withSubPath($element);
         }
+
         return $path;
     }
 
-    /**
-     * Transform to absolute path
-     *
-     * The optional parameter can be used to specify a dedicated root directory.
-     * If empty getcwd() will be used.
-     *
-     * <example>
-     *  phore_uri("relative/path/to/file")->abs("/root/dir") === "/root/dir/relative/path/to/file"
-     *  phore_uri("/absolute/path")->abs("/root/dir") === "/absolute/path"
-     * </example>
-     *
-     * @param null $cwd
-     * @return PhoreUri
-     */
-    public function abs(?string $cwd=null) : PhoreUri
+    public function join_secure(...$elements): PhoreUri
     {
-        if ($cwd === null)
-            $cwd = getcwd();
-        $newUri = $this->uri;
-        if ( ! startsWith($newUri, "/")) {
-            if (endsWith($cwd, "/"))
-                $cwd = substr($cwd, 0, -1);
-            $newUri = $cwd . "/" . $newUri;
+        $path = $this;
+        foreach ($elements as $element) {
+            $element = (string) $element;
+            if ($element === '.' || $element === '..') {
+                throw new \InvalidArgumentException("Path security violation: path must not contain '.' or '..'.");
+            }
+
+            $element = urlencode($element);
+            if ($element === '') {
+                throw new \InvalidArgumentException('Path must not contain an empty string element.');
+            }
+            $path = $path->withSubPath($element);
         }
-        return new PhoreUri($newUri);
+
+        return $path;
     }
 
-    /**
-     * Make a absolute path relative to the path provided in parameter 1
-     *
-     * If the path is already relative, return it. If it is not a subpath
-     * of the path throw error
-     *
-     * <example>
-     *  phore_uri("/some/absolute/path")->rel("/some") === "absolute/path"
-     *  phore_uri("reatlive/path")->rel("/some") === "relative/path"
-     * </example>
-     *
-     * @param string $rootPath
-     * @return PhoreUri
-     */
-    public function rel(string $rootPath) : PhoreUri
+    public function abs(?string $cwd = null): PhoreUri
     {
-        if ( ! startsWith($this->uri, "/"))
-            return new PhoreUri($this->uri);
-        if ( ! startsWith($this->uri, $rootPath))
-            throw new \InvalidArgumentException("Path '$this->uri' is not a subpath of '$rootPath'");
-        $newUri = substr($this->uri, strlen($rootPath));
-        if (startsWith($newUri, "/"))
-            $newUri = substr($newUri, 1);
-        return new PhoreUri($newUri);
+        if (str_starts_with($this->uri, '/')) {
+            return $this->spawn(PhoreUri::class, $this->uri, $this->accessPath, $this->relPath);
+        }
+
+        $cwd ??= getcwd();
+        if ($cwd === false || $cwd === null) {
+            throw new FilesystemException('Cannot resolve absolute path without a cwd.');
+        }
+
+        $display = rtrim($cwd, '/') . '/' . $this->uri;
+        $access = $this->filesystemContext->resolveInputPath($display);
+
+        return $this->spawn(PhoreUri::class, $display, $access, $this->relPath);
     }
 
-
-    public function withFileName(string $filename, string $fileExtension="") : PhoreFile
+    public function rel(string $rootPath): PhoreUri
     {
-        if ($fileExtension !== "" && ! ctype_alnum($fileExtension))
-            throw new \InvalidArgumentException("File extension '$fileExtension' must not contain special chars.");
-        if ($fileExtension !== "")
-            $fileExtension = "." . $fileExtension;
+        if (!str_starts_with($this->uri, '/')) {
+            return $this->spawn(PhoreUri::class, $this->uri, $this->accessPath, $this->relPath);
+        }
 
-        return new PhoreFile($this->uri . "/" . addslashes($filename) . $fileExtension);
+        $rootPath = rtrim(self::normalizeDisplayPath($rootPath), '/');
+        $current = self::normalizeDisplayPath($this->uri);
+        if ($current !== $rootPath && !str_starts_with($current, $rootPath . '/')) {
+            throw new \InvalidArgumentException(
+                "Path '{$this->uri}' is not a subpath of '$rootPath'."
+            );
+        }
+
+        $display = ltrim(substr($current, strlen($rootPath)), '/');
+        if ($display === '') {
+            $display = '.';
+        }
+
+        return $this->spawn(PhoreUri::class, $display, $this->accessPath, $this->relPath);
     }
 
-    /**
-     * Add a new File Extension or (if $replaceExistingExtension is true) replace the existing one.
-     *
-     * Checks for valid file extensions (only alnum chars) and throws an exception if not valid.
-     *
-     * @param string $fileExtension
-     * @param bool $replaceExistingExtension
-     * @param bool $strictChecks
-     * @return PhoreFile
-     */
-    public function withFileExtension(string $fileExtension, bool $replaceExistingExtension = false, bool $strictChecks = true) : PhoreFile {
-        if ($strictChecks && $fileExtension !== "" && ! ctype_alnum($fileExtension))
-            throw new \InvalidArgumentException("File extension '$fileExtension' must not contain special chars.");
-        if ($fileExtension !== "")
-            $fileExtension = "." . $fileExtension;
+    public function withFileName(string $filename, string $fileExtension = ''): PhoreFile
+    {
+        if (
+            $filename === ''
+            || str_contains($filename, '/')
+            || str_contains($filename, '\\')
+            || str_contains($filename, "\0")
+        ) {
+            throw new \InvalidArgumentException("Invalid filename '$filename'.");
+        }
+        if ($fileExtension !== '' && !ctype_alnum($fileExtension)) {
+            throw new \InvalidArgumentException(
+                "File extension '$fileExtension' must not contain special chars."
+            );
+        }
 
-        $newUri = $this->uri;
+        $name = $filename . ($fileExtension === '' ? '' : '.' . $fileExtension);
+        $child = $this->withSubPath($name);
+
+        return $child->asFile();
+    }
+
+    public function withFileExtension(
+        string $fileExtension,
+        bool $replaceExistingExtension = false,
+        bool $strictChecks = true
+    ): PhoreFile {
+        if ($strictChecks && $fileExtension !== '' && !ctype_alnum($fileExtension)) {
+            throw new \InvalidArgumentException(
+                "File extension '$fileExtension' must not contain special chars."
+            );
+        }
+
+        $suffix = $fileExtension === '' ? '' : '.' . $fileExtension;
+        $display = $this->uri;
+        $access = $this->accessPath;
+
         if ($replaceExistingExtension) {
-            $newUri = preg_replace("/\.[a-z0-9]+$/i", "", $newUri);
+            $display = preg_replace('/\.[a-z0-9]+$/i', '', $display) ?? $display;
+            $access = preg_replace('/\.[a-z0-9]+$/i', '', $access) ?? $access;
         }
-        return new PhoreFile($newUri . $fileExtension);
 
+        $relPath = $this->relPath;
+        if ($relPath !== null && $relPath !== []) {
+            $last = array_pop($relPath);
+            if ($replaceExistingExtension) {
+                $last = preg_replace('/\.[a-z0-9]+$/i', '', $last) ?? $last;
+            }
+            $relPath[] = $last . $suffix;
+        }
+
+        return $this->spawn(
+            PhoreFile::class,
+            $display . $suffix,
+            $access . $suffix,
+            $relPath
+        );
     }
 
-
-    public function withParentDir() : PhoreDirectory
+    public function withParentDir(): PhoreDirectory
     {
-        $newUri = dirname($this->uri);
-        if ($newUri === ".")
-            $newUri = "/";
-        return new PhoreDirectory($newUri);
+        $display = dirname($this->uri);
+        if ($display === '.') {
+            $display = '/';
+        }
+
+        return $this->spawn(
+            PhoreDirectory::class,
+            $display,
+            dirname($this->accessPath),
+            $this->parentRelPath()
+        );
     }
 
-
-    public function asDirectory() : PhoreDirectory
+    public function asDirectory(): PhoreDirectory
     {
-        return new PhoreDirectory($this->uri, $this->relPath);
+        return $this->spawn(PhoreDirectory::class, $this->uri, $this->accessPath, $this->relPath);
+    }
+
+    /**
+     * @template T of PhoreUri
+     * @param class-string<T> $class
+     * @param string[]|null $relPath
+     * @param array{
+     *   rootDir?: string|null,
+     *   followSymlinks?: bool,
+     *   allowHardLinks?: bool,
+     *   requireAtomicContainment?: bool
+     * }|FilesystemOptions|null $options
+     * @return T
+     */
+    protected function spawn(
+        string $class,
+        string $displayPath,
+        string $accessPath,
+        ?array $relPath,
+        array|FilesystemOptions|null $options = null
+    ): PhoreUri {
+        return new $class(
+            $displayPath,
+            $relPath,
+            $options,
+            $this->filesystemContext,
+            $accessPath
+        );
+    }
+
+    /**
+     * @param string|PhoreUri $target
+     */
+    protected function resolveTargetFile(string|PhoreUri $target): PhoreFile
+    {
+        if ($target instanceof PhoreUri) {
+            return $target->asFile();
+        }
+
+        return $this->spawn(
+            PhoreFile::class,
+            $target,
+            $this->filesystemContext->resolveInputPath($target),
+            null
+        );
+    }
+
+    protected function adoptPath(PhoreUri $target): void
+    {
+        $this->uri = $target->uri;
+        $this->accessPath = $target->accessPath;
+        $this->relPath = $target->relPath;
+        $this->filesystemContext = $target->filesystemContext;
+    }
+
+    /**
+     * @return string[]|null
+     */
+    private function parentRelPath(): ?array
+    {
+        if ($this->relPath === null) {
+            return null;
+        }
+
+        $parts = $this->relPath;
+        array_pop($parts);
+
+        return $parts;
+    }
+
+    private static function normalizeDisplayPath(string $path): string
+    {
+        $absolute = str_starts_with($path, '/');
+        $parts = [];
+
+        foreach (explode('/', $path) as $part) {
+            if ($part === '' || $part === '.') {
+                continue;
+            }
+            if ($part === '..') {
+                array_pop($parts);
+                continue;
+            }
+            $parts[] = $part;
+        }
+
+        $normalized = implode('/', $parts);
+
+        return $absolute ? '/' . $normalized : $normalized;
+    }
+
+    private static function joinDisplayPath(string $base, string $relative): string
+    {
+        $base = rtrim($base, '/');
+
+        return ($base === '' ? '' : $base . '/') . $relative;
     }
 }

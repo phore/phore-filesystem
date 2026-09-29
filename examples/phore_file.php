@@ -27,7 +27,7 @@ $size = $appFile->getFilesize();
 $copy = $root->withSubPath('copy/app.txt')->asFile();
 $appFile->copyTo($copy);
 $renamed = $root->withSubPath('copy/app-renamed.txt')->asFile();
-$copy->rename((string) $renamed);
+$copy->rename($renamed);
 $renamed->unlink();
 
 // JSON/YAML nicht selbst lesen und parsen: Formatfehler erhalten Dateikontext von Phore.

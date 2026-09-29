@@ -9,10 +9,9 @@ $src->withSubPath('sub/b.txt')->asFile()->mkdir()->set_contents('B');
 
 // Normalfall: rekursiv Dateien lesen, ohne eigene Walk-Methode oder Fehler-Wrapper.
 $contents = [];
-foreach ($src->listFiles('*.txt', true) as $file) {
-    $contents[$file->getRelPath()] = $file->get_contents();
+foreach ($src->listFiles('*.txt', recursive: true, sort: 'path') as $file) {
+    $contents[$file->getRelPath($src)] = $file->get_contents();
 }
-ksort($contents);
 assert($contents === ['a.txt' => 'A', 'sub/b.txt' => 'B']);
 
 // Alternative: Eintraege schrittweise verarbeiten statt eine Dateiliste zu materialisieren.
@@ -53,5 +52,5 @@ assert($walk === ['a.txt', 'sub'] && $walkR === ['a.txt', 'sub/b.txt']);
 assert($found->getBasename() === 'b.txt');
 assert(!$copy->withSubPath('sub/b.txt')->exists());
 
-// Die heutigen Walk-Methoden sind keine Symlink-Sandbox; siehe Options-Entwurf.
+// Root-/Symlink-Sicherheit wird im eigenen Beispiel phore_security.php gezeigt.
 echo "ok\n";

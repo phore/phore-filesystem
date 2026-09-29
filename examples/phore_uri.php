@@ -28,8 +28,8 @@ $relative = $file->withRelativePath('../other.txt');
 $abs = phore_uri('sub/demo.txt')->abs((string) $root);
 $rel = $file->rel((string) $root);
 
-// Pfad- und Mustervarianten, keine Autorisierung fuer nicht vertrauenswuerdige Pfade.
-// withSubPath(), rel() und isSubpathOf() ersetzen keinen Symlink-/Root-Schutz.
+// Ohne rootDir ist dies ein unbeschraenkter Neueinstieg. Sobald ein Root gebunden
+// ist, behalten withSubPath(), rel() und Typwechsel den Sicherheitskontext.
 $isSubpath = $file->isSubpathOf((string) $root);
 $matches = $file->fnmatch('*.txt');
 
