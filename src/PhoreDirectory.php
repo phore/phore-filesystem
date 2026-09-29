@@ -12,6 +12,19 @@ use Phore\FileSystem\Exception\UnsupportedFilesystemPolicyException;
 
 class PhoreDirectory extends PhoreUri
 {
+    /**
+     * Legt das Verzeichnis inklusive fehlender Parent-Verzeichnisse an.
+     *
+     * Bestehende Verzeichnisse bleiben unverändert. Vor der Erstellung werden
+     * Ziel und letzter existierender Parent gegen Root-, Symlink- und weitere
+     * Filesystem-Policies geprüft.
+     *
+     * @param int $createMask Unix-Rechtemaske für neu erzeugte Verzeichnisse.
+     * @return self Dasselbe Verzeichnisobjekt.
+     * @throws FilesystemException Wenn das Verzeichnis nicht angelegt werden kann.
+     * @see PhoreUri::assertDirectory()
+     * @example assert($dir->mkdir()->isDirectory() === true);
+     */
     public function mkdir($createMask = 0777): self
     {
         $path = $this->getFilesystemPathForOperation('mkdir', true);
@@ -40,6 +53,19 @@ class PhoreDirectory extends PhoreUri
         return $this;
     }
 
+    /**
+     * Entfernt dieses Verzeichnis, optional inklusive seines Inhalts.
+     *
+     * Bei recursive=true wird über den gemeinsamen Traversierungskern gelöscht;
+     * dadurch greifen Root-, Symlink-, Dateityp- und Cycle-Prüfungen vor dem
+     * Entfernen. Ein nicht existierendes Verzeichnis wird als no-op behandelt.
+     *
+     * @param bool $recursive Inhalt rekursiv entfernen.
+     * @return self Dasselbe Verzeichnisobjekt.
+     * @throws FilesystemException Wenn Traversierung oder rmdir fehlschlagen.
+     * @see self::genWalk()
+     * @example $dir->rmDir(recursive: true);
+     */
     public function rmDir($recursive = false): self
     {
         if (!$this->exists()) {
@@ -66,6 +92,18 @@ class PhoreDirectory extends PhoreUri
         return $this;
     }
 
+    /**
+     * Ändert den Besitzer des autorisierten Verzeichnisses.
+     *
+     * Der Pfad wird vor chown() vollständig über den gebundenen FilesystemContext
+     * geprüft; dadurch kann die Operation keine rootDir- oder Symlink-Grenze umgehen.
+     *
+     * @param string|int $owner Benutzername oder numerische User-ID.
+     * @return self Dasselbe Verzeichnisobjekt.
+     * @throws FilesystemException Wenn chown() fehlschlägt.
+     * @see PhoreUri::getFilesystemOptions()
+     * @example $dir->chown('www-data');
+     */
     public function chown($owner): self
     {
         $path = $this->getFilesystemPathForOperation('chown', false);
@@ -251,6 +289,20 @@ class PhoreDirectory extends PhoreUri
         return $entries;
     }
 
+    /**
+     * Entpackt ein ZIP-Archiv per externem unzip-Prozess in dieses Verzeichnis.
+     *
+     * Externe Prozesse können die objektgebundene Filesystem-Policy nicht sicher
+     * durchsetzen. Deshalb ist diese Methode für rootDir-gebundene oder atomar
+     * eingeschränkte Objekte absichtlich gesperrt. Ohne solche Restrictions wird
+     * das Zielverzeichnis vor dem Prozessaufruf dennoch autorisiert.
+     *
+     * @param string|PhoreUri $filename Pfad zum ZIP-Archiv.
+     * @return void
+     * @throws UnsupportedFilesystemPolicyException Wenn externe Prozesse nicht erlaubt sind.
+     * @see PhoreUri::assertExternalProcessAllowed()
+     * @example $dir->importZipFile('/tmp/archive.zip');
+     */
     public function importZipFile($filename)
     {
         $this->assertExternalProcessAllowed('importZipFile');
@@ -263,6 +315,19 @@ class PhoreDirectory extends PhoreUri
         );
     }
 
+    /**
+     * Sucht rekursiv die erste reguläre Datei, deren vollständiger Pfad zum Regex passt.
+     *
+     * Die Suche verwendet listFiles() und übernimmt damit alle Traversierungs- und
+     * Security-Prüfungen. Treffer werden als gebundene PhoreFile-Objekte zurückgegeben.
+     *
+     * @param string $regex PCRE-Muster.
+     * @param array|null $matches Optionales preg_match()-Ergebnis des Treffers.
+     * @return PhoreFile Erster passender Treffer.
+     * @throws FileNotFoundException Wenn keine Datei passt.
+     * @see self::listFiles()
+     * @example assert($dir->getFileByPattern('/composer\\.json$/')->getBasename() === 'composer.json');
+     */
     public function getFileByPattern(string $regex, &$matches = null): PhoreFile
     {
         foreach ($this->listFiles(recursive: true) as $file) {
@@ -276,6 +341,20 @@ class PhoreDirectory extends PhoreUri
         );
     }
 
+    /**
+     * Kopiert alle regulären Dateien rekursiv in ein Zielverzeichnis.
+     *
+     * Relative Pfade werden mit getRelPath() bestimmt und im Ziel über withSubPath()
+     * neu aufgebaut. Dadurch gelten sowohl der Source- als auch der Target-Context;
+     * insbesondere können Root- oder Symlink-Grenzen nicht durch den Kopiervorgang
+     * umgangen werden.
+     *
+     * @param PhoreDirectory $targetDir Zielverzeichnis.
+     * @return void
+     * @throws FilesystemException Bei Traversierungs-, Lese- oder Schreibfehlern.
+     * @see self::moveTo()
+     * @example $source->copyTo($target); assert($target->withSubPath('file.txt')->exists());
+     */
     public function copyTo(PhoreDirectory $targetDir): void
     {
         $this->getFilesystemPathForOperation('copy source directory', false);
@@ -294,6 +373,19 @@ class PhoreDirectory extends PhoreUri
         }
     }
 
+    /**
+     * Verschiebt alle regulären Dateien rekursiv in ein Zielverzeichnis.
+     *
+     * Technisch werden Dateien über die geprüften Phore-Operationen kopiert und
+     * anschließend aus der Quelle gelöscht. Source- und Target-Security-Contexts
+     * bleiben wirksam; bei einem Fehler kann daher bereits ein Teil kopiert sein.
+     *
+     * @param PhoreDirectory $targetDir Zielverzeichnis.
+     * @return void
+     * @throws FilesystemException Bei Traversierungs-, Lese-, Schreib- oder Löschfehlern.
+     * @see self::copyTo()
+     * @example $source->moveTo($target); assert($target->withSubPath('file.txt')->exists());
+     */
     public function moveTo(PhoreDirectory $targetDir): void
     {
         $this->getFilesystemPathForOperation('move source directory', false);
