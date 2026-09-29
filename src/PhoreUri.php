@@ -221,7 +221,7 @@ class PhoreUri
         $relative = $this->assertRelativePath($subpath);
         $displayBase = $this instanceof PhoreFile ? dirname($this->uri) : $this->uri;
         $accessBase = $this instanceof PhoreFile ? dirname($this->accessPath) : $this->accessPath;
-        $access = $this->filesystemContext->resolveRelative($accessBase, $subpath);
+        $access = $this->filesystemContext->resolveSubPath($accessBase, $subpath);
         $display = self::joinDisplayPath($displayBase, $relative);
 
         $relPath = $this->relPath ?? [];

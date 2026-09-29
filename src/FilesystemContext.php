@@ -82,6 +82,18 @@ final class FilesystemContext
     }
 
     /**
+     * Resolves a subpath and guarantees that its resolved target remains below
+     * the supplied base path, independently of an optional global rootDir.
+     */
+    public function resolveSubPath(string $basePath, string $relativePath): string
+    {
+        $absolute = $this->resolveRelative($basePath, $relativePath);
+        $this->assertResolvedPathWithinBase($absolute, $basePath);
+
+        return $absolute;
+    }
+
+    /**
      * Derives a context from an already authorized object.
      *
      * Missing options and an empty array inherit everything. A partial array
@@ -343,6 +355,62 @@ final class FilesystemContext
                 "Hard-linked file '$absolute' is not allowed by the current filesystem policy."
             );
         }
+    }
+
+    private function assertResolvedPathWithinBase(string $absolute, string $basePath): void
+    {
+        $resolvedBase = $this->resolveExistingPrefix($basePath);
+        $resolvedPath = $this->resolveExistingPrefix($absolute);
+
+        if (!self::isWithin($resolvedPath, $resolvedBase)) {
+            throw new PathOutOfBoundsException(
+                "Resolved subpath '$resolvedPath' escapes base path '$resolvedBase'."
+            );
+        }
+    }
+
+    /**
+     * Resolves the longest existing prefix and appends missing descendants.
+     *
+     * This lets prospective create targets stay usable while still detecting
+     * symlinks in every existing component of the path.
+     */
+    private function resolveExistingPrefix(string $path): string
+    {
+        $absolute = self::normalizeAbsolutePath($path);
+        $probe = $absolute;
+        $missing = [];
+
+        while (!file_exists($probe) && !is_link($probe)) {
+            $parent = dirname($probe);
+            if ($parent === $probe) {
+                break;
+            }
+
+            array_unshift($missing, basename($probe));
+            $probe = $parent;
+        }
+
+        if (!file_exists($probe) && !is_link($probe)) {
+            throw new FileAccessException(
+                "Cannot establish a filesystem parent for '$absolute'."
+            );
+        }
+
+        $real = realpath($probe);
+        if ($real === false) {
+            throw new FilesystemPolicyViolationException(
+                "Path '$probe' contains a broken or unresolvable symlink."
+            );
+        }
+
+        if ($missing === []) {
+            return self::normalizeAbsolutePath($real);
+        }
+
+        return self::normalizeAbsolutePath(
+            rtrim($real, '/') . '/' . implode('/', $missing)
+        );
     }
 
     private function assertResolvedPathWithinRoot(string $absolute, bool $allowMissingLeaf): void

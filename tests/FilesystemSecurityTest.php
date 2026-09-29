@@ -101,6 +101,48 @@ class FilesystemSecurityTest extends TestCase
         }
     }
 
+    public function testWithSubPathAllowsSymlinkThatStaysInsideBase(): void
+    {
+        $base = new PhoreTempDir();
+        $scope = $base->withSubPath('scope')->assertDirectory(true);
+        $target = $scope->withSubPath('target')->assertDirectory(true);
+        $target->withSubPath('inside.txt')->asFile()->set_contents('inside');
+        $link = (string) $scope . '/internal';
+
+        if (!@symlink((string) $target, $link)) {
+            $this->markTestSkipped('Symlinks are not available on this platform.');
+        }
+
+        try {
+            $this->assertSame(
+                'inside',
+                $scope->withSubPath('internal/inside.txt')->asFile()->get_contents()
+            );
+        } finally {
+            @unlink($link);
+        }
+    }
+
+    public function testWithSubPathRejectsSymlinkEscapeWithoutRoot(): void
+    {
+        $base = new PhoreTempDir();
+        $scope = $base->withSubPath('scope')->assertDirectory(true);
+        $outside = $base->withSubPath('outside')->assertDirectory(true);
+        $outside->withSubPath('secret.txt')->asFile()->set_contents('secret');
+        $link = (string) $scope . '/external';
+
+        if (!@symlink((string) $outside, $link)) {
+            $this->markTestSkipped('Symlinks are not available on this platform.');
+        }
+
+        try {
+            $this->expectException(PathOutOfBoundsException::class);
+            $scope->withSubPath('external/secret.txt');
+        } finally {
+            @unlink($link);
+        }
+    }
+
     public function testExplicitNoFollowRejectsSymlink(): void
     {
         $base = new PhoreTempDir();
