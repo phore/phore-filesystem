@@ -47,7 +47,7 @@ class FilesystemSecurityTest extends TestCase
 
         $this->assertSame('inside', $roundTrip->get_contents());
         $this->assertSame((string) $allowed, $roundTrip->getFilesystemOptions()->rootDir);
-        $this->assertFalse($roundTrip->getFilesystemOptions()->followSymlinks);
+        $this->assertTrue($roundTrip->getFilesystemOptions()->followSymlinks);
 
         $this->expectException(PathOutOfBoundsException::class);
         $roundTrip->withRelativePath('../sibling/secret.txt')->asFile()->get_contents();
@@ -58,7 +58,10 @@ class FilesystemSecurityTest extends TestCase
         $base = new PhoreTempDir();
         $allowed = $base->withSubPath('allowed')->assertDirectory(true);
         $file = $allowed->withSubPath('inside.txt')->asFile()->set_contents('inside');
-        $bounded = phore_file($file, ['rootDir' => (string) $allowed]);
+        $bounded = phore_file($file, [
+            'rootDir' => (string) $allowed,
+            'followSymlinks' => false,
+        ]);
 
         try {
             phore_file($bounded, ['rootDir' => null]);
@@ -81,7 +84,24 @@ class FilesystemSecurityTest extends TestCase
         phore_file($bounded, FilesystemOptions::fromAssoc([]));
     }
 
-    public function testDefaultPolicyRejectsSymlink(): void
+    public function testDefaultPolicyFollowsSymlink(): void
+    {
+        $base = new PhoreTempDir();
+        $target = $base->withSubPath('target.txt')->asFile()->set_contents('target');
+        $link = (string) $base . '/link.txt';
+
+        if (!@symlink((string) $target, $link)) {
+            $this->markTestSkipped('Symlinks are not available on this platform.');
+        }
+
+        try {
+            $this->assertSame('target', phore_file($link)->get_contents());
+        } finally {
+            @unlink($link);
+        }
+    }
+
+    public function testExplicitNoFollowRejectsSymlink(): void
     {
         $base = new PhoreTempDir();
         $target = $base->withSubPath('target.txt')->asFile()->set_contents('target');
@@ -93,13 +113,13 @@ class FilesystemSecurityTest extends TestCase
 
         try {
             $this->expectException(SymlinkNotAllowedException::class);
-            phore_file($link)->get_contents();
+            phore_file($link, ['followSymlinks' => false])->get_contents();
         } finally {
             @unlink($link);
         }
     }
 
-    public function testExplicitFollowAllowsOnlyInternalSymlink(): void
+    public function testRootAllowsOnlyInternalSymlinkByDefault(): void
     {
         $base = new PhoreTempDir();
         $allowed = $base->withSubPath('allowed')->assertDirectory(true);
@@ -120,7 +140,6 @@ class FilesystemSecurityTest extends TestCase
         try {
             $options = [
                 'rootDir' => (string) $allowed,
-                'followSymlinks' => true,
             ];
 
             $this->assertSame('inside', phore_file($internalLink, $options)->get_contents());
@@ -207,7 +226,7 @@ class FilesystemSecurityTest extends TestCase
         $root = phore_dir($allowed, ['rootDir' => (string) $allowed]);
 
         try {
-            $this->expectException(SymlinkNotAllowedException::class);
+            $this->expectException(PathOutOfBoundsException::class);
             $root->listFiles('*.md', recursive: true);
         } finally {
             @unlink($link);

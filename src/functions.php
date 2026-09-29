@@ -37,8 +37,9 @@ function phore_uri(
  * Creates a file view while preserving inherited filesystem restrictions.
  *
  * rootDir=null means no root boundary only for a new string entry point.
- * followSymlinks defaults to false. An inherited root or another restriction
- * can only remain unchanged or become stricter; attempts to relax it throw.
+ * followSymlinks defaults to true. With rootDir set, resolved symlink targets
+ * must remain inside that root. Inherited restrictions can only remain unchanged
+ * or become stricter; attempts to relax them throw.
  *
  * @param string|PhoreUri $filename
  * @param array{

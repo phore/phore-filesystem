@@ -15,11 +15,11 @@ $root = phore_dir($allowed, [
     'rootDir' => (string) $allowed,
 ]);
 
-// Alle abgeleiteten Datei-/Directory-Objekte behalten rootDir und No-Follow.
+// Alle abgeleiteten Datei-/Directory-Objekte behalten rootDir und die Symlink-Policy.
 $page = phore_file($root->withSubPath('index.md'));
 assert($page->get_contents() === '# Start');
 assert($page->getFilesystemOptions()->rootDir === (string) $allowed);
-assert($page->getFilesystemOptions()->followSymlinks === false);
+assert($page->getFilesystemOptions()->followSymlinks === true);
 
 // Die Darstellungsbasis fuer Walk-Ergebnisse aendert die Sicherheits-Root nicht.
 $paths = array_map(

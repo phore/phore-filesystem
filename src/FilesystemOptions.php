@@ -23,7 +23,7 @@ final class FilesystemOptions
 
     public function __construct(
         ?string $rootDir = null,
-        bool $followSymlinks = false,
+        bool $followSymlinks = true,
         bool $allowHardLinks = true,
         bool $requireAtomicContainment = false
     ) {
@@ -45,7 +45,7 @@ final class FilesystemOptions
      * Unknown keys and non-exact value types are rejected; values are never
      * silently cast. The accepted keys are:
      * - rootDir: string|null, default null (no root boundary)
-     * - followSymlinks: bool, default false
+     * - followSymlinks: bool, default true
      * - allowHardLinks: bool, default true
      * - requireAtomicContainment: bool, default false
      *
@@ -65,7 +65,7 @@ final class FilesystemOptions
 
         return new self(
             rootDir: $options['rootDir'] ?? null,
-            followSymlinks: $options['followSymlinks'] ?? false,
+            followSymlinks: $options['followSymlinks'] ?? true,
             allowHardLinks: $options['allowHardLinks'] ?? true,
             requireAtomicContainment: $options['requireAtomicContainment'] ?? false
         );
@@ -82,7 +82,7 @@ final class FilesystemOptions
      * }|FilesystemOptions|null $options
      * @throws InvalidFilesystemOptionsException
      * @see self::fromAssoc()
-     * @example FilesystemOptions::from(['followSymlinks' => true]);
+     * @example FilesystemOptions::from(['followSymlinks' => false]);
      */
     public static function from(array|self|null $options): self
     {
