@@ -5,6 +5,12 @@
 
 File access functions
 
+## Version 2
+
+Version 2 requires **PHP 8.5 or newer** and introduces explicit filesystem security policies. New filesystem entry points follow symbolic links by default, matching normal filesystem behavior. With `rootDir` set, resolved symlink targets must stay inside that root. Root-bound objects carry their security context through derived files, directories, walks and streams.
+
+The current v1 release line remains `v1.1.x`; this pull request prepares `v2.0.0`.
+
 
 - Working with sub-paths 
 - Checking symbolic links
@@ -13,9 +19,22 @@ File access functions
 ## Installation
 
 ```
-compser require phore/filesystem
+composer require phore/filesystem:^2.0
 ```
 
+
+## Security-first usage
+
+```php
+$root = phore_dir('/srv/site/docs', [
+    'rootDir' => '/srv/site/docs',
+]);
+
+$page = $root->withSubPath('index.md')->asFile();
+echo $page->get_contents();
+```
+
+The default is `followSymlinks=true`. Set `rootDir` when access must stay inside a bounded tree; symlinks may then be followed only when their resolved target remains inside that root. Use `followSymlinks=false` for an explicit no-symlink policy.
 
 ## General usage
 

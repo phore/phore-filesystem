@@ -1,4 +1,6 @@
 <?php
+
+declare(strict_types=1);
 /**
  * Created by PhpStorm.
  * User: matthes
@@ -9,7 +11,6 @@
 namespace Phore\FileSystem;
 
 
-use mysql_xdevapi\Exception;
 use Phore\Core\Exception\InvalidDataException;
 use Phore\Core\Exception\YamlDecodeException;
 use Phore\FileSystem\Exception\FileAccessException;
@@ -62,7 +63,8 @@ class PhoreFile extends PhoreUri
     private function _read_content_locked ()
     {
         $this->validate();
-        $file = $this->fopen("r", LOCK_SH);
+        $file = $this->fopen("r");
+        $file->flock(LOCK_SH);
         $buf = "";
         while ( ! $file->feof())
             $buf .= $file->fread(32000);
@@ -95,13 +97,11 @@ class PhoreFile extends PhoreUri
      */
     public function get_contents()
     {
-        try {
-            return $this->_read_content_locked();
-        } catch (\Exception $e) {
-            if ( ! $this->exists())
-                throw new FileNotFoundException("File '$this->uri' not found.");
-            throw new FilesystemException($e->getMessage(), $e->getCode(), $e);
+        if (!$this->exists()) {
+            throw new FileNotFoundException("File '{$this->getUri()}' not found.");
         }
+
+        return $this->_read_content_locked();
     }
 
     /**
@@ -122,7 +122,7 @@ class PhoreFile extends PhoreUri
     public function streamCopyTo($destinationFile, ?int $maxlen=null)
     {
         $this->validate();
-        $destinationFile = phore_file($destinationFile);
+        $destinationFile = $this->resolveTargetFile($destinationFile);
         $targetStream = $destinationFile->fopen("w+");
 
         $sourceStream = $this->fopen("r");
@@ -143,7 +143,7 @@ class PhoreFile extends PhoreUri
     public function copyTo($destinationFile, bool $mkdir = true)
     {
         $this->validate();
-        $destinationFile = phore_file($destinationFile);
+        $destinationFile = $this->resolveTargetFile($destinationFile);
         $destinationFile->getDirname()->assertDirectory($mkdir);
         $this->streamCopyTo($destinationFile);
     }
@@ -182,36 +182,37 @@ class PhoreFile extends PhoreUri
     public function createPath(int $createMask=0777) : self
     {
         $this->validate();
-        phore_dir($this->getDirname())->mkdir($createMask);
+        $this->getDirname()->asDirectory()->mkdir($createMask);
         return $this;
     }
 
 
 
-    public function set_contents (string $contents) : self
+    public function set_contents(string $contents): self
     {
-        try {
-            $this->_write_content_locked($contents);
-        } catch (\Exception $e) {
-            throw new FilesystemException($e->getMessage(), $e->getCode(), $e);
+        $this->_write_content_locked($contents);
+
+        return $this;
+    }
+
+
+    public function chmod(int $mode): self
+    {
+        $path = $this->getFilesystemPathForOperation('chmod', false);
+        if (!@chmod($path, $mode)) {
+            throw new FilesystemException("Cannot chmod '{$this->getUri()}' to $mode.");
         }
+
         return $this;
     }
 
-
-    public function chmod(int $mode) : self
+    public function chown(string $owner): self
     {
-        $this->validate();
-        if ( ! chmod($this->uri, $mode))
-            throw new FilesystemException("Cannot chmod $this->uri to $mode");
-        return $this;
-    }
+        $path = $this->getFilesystemPathForOperation('chown', false);
+        if (!@chown($path, $owner)) {
+            throw new FilesystemException("Cannot chown '{$this->getUri()}' to user '$owner'.");
+        }
 
-    public function chown (string $owner) : self
-    {
-        $this->validate();
-        if ( ! chown($this->uri, $owner))
-            throw new FilesystemException("Cannot chown $this->uri to user $owner");
         return $this;
     }
 
@@ -241,16 +242,11 @@ class PhoreFile extends PhoreUri
      *
      * @return PhoreFile
      */
-    public function append_content(string $appendContent) : self
+    public function append_content(string $appendContent): self
     {
-        try {
-            $this->_write_content_locked($appendContent, true);
-            return $this;
-        } catch (\Exception $e) {
-            if ($e instanceof \ErrorException)
-                throw new \Exception($e->getMessage(), $e->getCode(), $e);
-            throw new $e($e->getMessage(), $e->getCode(), $e);
-        }
+        $this->_write_content_locked($appendContent, true);
+
+        return $this;
     }
 
     /**
@@ -265,7 +261,16 @@ class PhoreFile extends PhoreUri
     public function fileSize () : int
     {
         $this->validate();
-        return filesize($this->uri);
+        return filesize($this->getFilesystemPathForOperation('filesize', false));
+    }
+
+    private function assertSafeYamlInput(string $yaml): void
+    {
+        if (preg_match('/!php\\/object\\b/i', $yaml)) {
+            throw new FileParsingException(
+                "Unsafe PHP object YAML tag in file '{$this->getUri()}'."
+            );
+        }
     }
 
     /**
@@ -279,13 +284,10 @@ class PhoreFile extends PhoreUri
      */
     public function get_yaml(?string $cast=null)
     {
-        try {
-            $textData = $this->get_contents();
-        } catch (\Exception $e) {
-            throw new $e($e->getMessage(), $e->getCode(), $e);
-        }
-        try {
+        $textData = $this->get_contents();
+        $this->assertSafeYamlInput($textData);
 
+        try {
             $ret = phore_yaml_decode($textData);
         } catch (\InvalidArgumentException $e) {
             throw new FileParsingException($e->getMessage() . " in file '{$this->getUri()}'", 0, $e);
@@ -388,12 +390,16 @@ class PhoreFile extends PhoreUri
      * @throws FileNotFoundException
      * @throws FileParsingException
      */
-    public function get_front_matter(?string $cast = null) : FrontMatterFile
+    public function get_front_matter(?string $cast = null, bool $required = true): ?FrontMatterFile
     {
         $contents = $this->get_contents();
         $filename = $this->getUri();
 
-        if ( ! preg_match('/\A---\r?\n/', $contents)) {
+        if (!preg_match('/\A---\r?\n/', $contents)) {
+            if (!$required) {
+                return null;
+            }
+
             throw new FileParsingException(
                 "Front matter parsing of file '{$filename}' failed on line 1: Expected opening delimiter '---'."
             );
@@ -416,6 +422,8 @@ class PhoreFile extends PhoreUri
         } elseif (str_ends_with($yaml, "\n")) {
             $yaml = substr($yaml, 0, -1);
         }
+
+        $this->assertSafeYamlInput($yaml);
 
         try {
             $header = trim($yaml) === '' ? [] : phore_yaml_decode($yaml);
@@ -456,25 +464,16 @@ class PhoreFile extends PhoreUri
             }
         }
 
-        return new FrontMatterFile($filename, $header, $matches['content']);
+        return new FrontMatterFile($filename, $header, $matches['content'], $contents);
     }
 
 
     /**
      * Write a Jekyll-style front matter file.
      */
-    public function put_front_matter(FrontMatterFile $frontMatterFile) : self
+    public function put_front_matter(FrontMatterFile $frontMatterFile): self
     {
-        $header = phore_object_to_array($frontMatterFile->header);
-        $yaml = $header === [] ? '' : rtrim(phore_yaml_encode($header), "\r\n");
-
-        $contents = "---\n";
-        if ($yaml !== '') {
-            $contents .= $yaml . "\n";
-        }
-        $contents .= "---\n" . $frontMatterFile->content;
-
-        return $this->set_contents($contents);
+        return $this->set_contents($frontMatterFile->render());
     }
 
 
@@ -726,42 +725,68 @@ class PhoreFile extends PhoreUri
      * @param string $mode
      * @return PhoreFile
      */
-    public function touch(int $mode=0777) : self
+    public function touch(int $mode = 0777): self
     {
-        $this->validate();
-        if ( ! file_exists($this->uri)) {
-            if ( ! file_exists(dirname($this->uri)))
-                mkdir(dirname($this->uri),  $mode, true);
-            touch($this->uri);
-            chmod($this->uri, $mode);
+        $path = $this->getFilesystemPathForOperation('touch', true);
+        if (!file_exists($path)) {
+            $this->getDirname()->asDirectory()->mkdir($mode);
+            if (!@touch($path)) {
+                $message = error_get_last()['message'] ?? 'unknown error';
+                throw new FilesystemException(
+                    "Cannot touch file '{$this->getUri()}': $message"
+                );
+            }
         }
-        if ( ! is_file($this->uri))
-            throw new FilesystemException("touch file '$this->uri': Uri exists but is not a file.");
+
+        $this->getFilesystemPathForOperation('touch result', false);
+        if (!is_file($path)) {
+            throw new FilesystemException(
+                "touch file '{$this->getUri()}': Uri exists but is not a file."
+            );
+        }
+
         return $this;
     }
 
 
-    public function getFilesize() : int
+    public function getFilesize(): int
     {
-        $this->validate();
-        return filesize($this->uri);
+        return filesize($this->getFilesystemPathForOperation('getFilesize', false));
     }
 
 
-    public function rename ($newName) : self
+    public function rename($newName): self
     {
-        $this->validate($newName);
-        if ( ! @rename($this->uri, $newName))
-            throw new FileAccessException("Cannot rename file '{$this->uri}' to '{$newName}': " . implode(" ", error_get_last()));
-        $this->filename = $newName;
+        if (!is_string($newName) && !$newName instanceof PhoreUri) {
+            throw new \InvalidArgumentException('rename target must be string or PhoreUri.');
+        }
+
+        $target = $this->resolveTargetFile($newName);
+        $sourcePath = $this->getFilesystemPathForOperation('rename source', false);
+        $targetPath = $target->getFilesystemPathForOperation('rename target', true);
+
+        if (!@rename($sourcePath, $targetPath)) {
+            $message = error_get_last()['message'] ?? 'unknown error';
+            throw new FileAccessException(
+                "Cannot rename file '{$this->getUri()}' to '{$target->getUri()}': $message"
+            );
+        }
+
+        $this->adoptPath($target);
+
         return $this;
     }
 
-    public function unlink() : self
+    public function unlink(): self
     {
-        $this->validate();
-        if ( ! @unlink($this->uri))
-            throw new FileAccessException("Cannot unlink file '{$this->uri}': " . implode(" ", error_get_last()));
+        $path = $this->getFilesystemPathForOperation('unlink', false);
+        if (!@unlink($path)) {
+            $message = error_get_last()['message'] ?? 'unknown error';
+            throw new FileAccessException(
+                "Cannot unlink file '{$this->getUri()}': $message"
+            );
+        }
+
         return $this;
     }
 

@@ -1,290 +1,518 @@
 <?php
-/**
- * Created by PhpStorm.
- * User: matthes
- * Date: 17.07.18
- * Time: 17:57
- */
+
+declare(strict_types=1);
 
 namespace Phore\FileSystem;
-
 
 use Phore\FileSystem\Exception\FileAccessException;
 use Phore\FileSystem\Exception\FileNotFoundException;
 use Phore\FileSystem\Exception\FilesystemException;
+use Phore\FileSystem\Exception\FilesystemPolicyViolationException;
+use Phore\FileSystem\Exception\UnsupportedFilesystemPolicyException;
 
 class PhoreDirectory extends PhoreUri
 {
-
-
-    public function mkdir($createMask=0777) : self
+    /**
+     * Legt das Verzeichnis inklusive fehlender Parent-Verzeichnisse an.
+     *
+     * Bestehende Verzeichnisse bleiben unverändert. Vor der Erstellung werden
+     * Ziel und letzter existierender Parent gegen Root-, Symlink- und weitere
+     * Filesystem-Policies geprüft.
+     *
+     * @param int $createMask Unix-Rechtemaske für neu erzeugte Verzeichnisse.
+     * @return self Dasselbe Verzeichnisobjekt.
+     * @throws FilesystemException Wenn das Verzeichnis nicht angelegt werden kann.
+     * @see PhoreUri::assertDirectory()
+     * @example assert($dir->mkdir()->isDirectory() === true);
+     */
+    public function mkdir($createMask = 0777): self
     {
-        $this->validate();
-        if ( ! is_dir($this->uri)) {
-            try {
-                if (!mkdir($concurrentDirectory = $this->uri, $createMask, true) && !is_dir($concurrentDirectory)) {
-                    throw new \RuntimeException(sprintf('Directory "%s" was not created', $concurrentDirectory));
-                }
-            } catch (\Error | \ErrorException $e) {
-                throw new FilesystemException("Cannot create directory '$this->uri': " . $e->getMessage());
-            }
+        $path = $this->getFilesystemPathForOperation('mkdir', true);
 
+        if (!is_dir($path)) {
+            $parent = dirname($path);
+            while (!file_exists($parent)) {
+                $next = dirname($parent);
+                if ($next === $parent) {
+                    break;
+                }
+                $parent = $next;
+            }
+            $this->filesystemContext->assertAccess($parent, 'mkdir parent', false);
+
+            if (!@mkdir($path, $createMask, true) && !is_dir($path)) {
+                $message = error_get_last()['message'] ?? 'unknown error';
+                throw new FilesystemException(
+                    "Cannot create directory '{$this->uri}': $message"
+                );
+            }
         }
+
+        $this->getFilesystemPathForOperation('mkdir result', false);
+
         return $this;
     }
 
-    private function _rmDirRecursive(string $dir)
+    /**
+     * Entfernt dieses Verzeichnis, optional inklusive seines Inhalts.
+     *
+     * Bei recursive=true wird über den gemeinsamen Traversierungskern gelöscht;
+     * dadurch greifen Root-, Symlink-, Dateityp- und Cycle-Prüfungen vor dem
+     * Entfernen. Ein nicht existierendes Verzeichnis wird als no-op behandelt.
+     *
+     * @param bool $recursive Inhalt rekursiv entfernen.
+     * @return self Dasselbe Verzeichnisobjekt.
+     * @throws FilesystemException Wenn Traversierung oder rmdir fehlschlagen.
+     * @see self::genWalk()
+     * @example $dir->rmDir(recursive: true);
+     */
+    public function rmDir($recursive = false): self
     {
-        if ( ! is_dir($dir))
-            return false;
-        $files = array_diff(scandir($dir), array('.','..'));
-        foreach ($files as $file) {
-            (is_dir("$dir/$file")) ? $this->_rmDirRecursive("$dir/$file") : unlink("$dir/$file");
-        }
-        return rmdir($dir);
-    }
-
-    public function rmDir($recursive=false) : self
-    {
-        $this->validate();
-        if ( ! is_dir($this->uri))
+        if (!$this->exists()) {
             return $this;
+        }
 
         if ($recursive === true) {
-            $this->_rmDirRecursive((string)$this);
-        } else {
-            if ( ! rmdir((string)$this))
-                throw new FilesystemException("Cannot rmdir $this->uri");
-        }
-        return $this;
-    }
-
-    public function chown ($owner) : self
-    {
-        $this->validate();
-        if ( ! chown($this->uri, $owner))
-            throw new FilesystemException("Cannot chown $this->uri to user $owner");
-        return $this;
-    }
-
-
-    public function walk(callable $fn, ?string $filter=null) : bool
-    {
-        $this->validate();
-        $dirFp = opendir($this->uri);
-        if (!$dirFp)
-            throw new FileAccessException("Cannot open path '{$this->uri}' for indexing.");
-        while (($curSub = readdir($dirFp)) !== false) {
-            if ($curSub == "." || $curSub == "..")
-                continue;
-
-            if ($filter !== null) {
-                if ( ! fnmatch($filter, $curSub)) {
+            foreach ($this->genWalk(null, true) as $entry) {
+                if ($entry->isFile()) {
+                    $entry->asFile()->unlink();
                     continue;
                 }
+
+                $entry->asDirectory()->rmDir(false);
             }
+        }
 
-            $path = $this->withSubPath($curSub);
-            if ($path->isFile())
-                $path = $path->asFile();
+        $path = $this->getFilesystemPathForOperation('rmdir', false);
+        if (!@rmdir($path)) {
+            $message = error_get_last()['message'] ?? 'unknown error';
+            throw new FilesystemException("Cannot rmdir '{$this->uri}': $message");
+        }
 
-            $ret = $fn($path);
-            if ($ret === false) {
-                closedir($dirFp);
+        return $this;
+    }
+
+    /**
+     * Ändert den Besitzer des autorisierten Verzeichnisses.
+     *
+     * Der Pfad wird vor chown() vollständig über den gebundenen FilesystemContext
+     * geprüft; dadurch kann die Operation keine rootDir- oder Symlink-Grenze umgehen.
+     *
+     * @param string|int $owner Benutzername oder numerische User-ID.
+     * @return self Dasselbe Verzeichnisobjekt.
+     * @throws FilesystemException Wenn chown() fehlschlägt.
+     * @see PhoreUri::getFilesystemOptions()
+     * @example $dir->chown('www-data');
+     */
+    public function chown($owner): self
+    {
+        $path = $this->getFilesystemPathForOperation('chown', false);
+        if (!@chown($path, $owner)) {
+            throw new FilesystemException("Cannot chown '{$this->uri}' to user '$owner'.");
+        }
+
+        return $this;
+    }
+
+    /**
+     * Besucht direkte Verzeichniseinträge, optional gefiltert nach Basename.
+     *
+     * Gibt der Callback false zurück, endet der Walk kontrolliert mit false.
+     * Security- oder Zugriffsfehler bleiben Exceptions und werden nicht als Stop-Signal
+     * verschluckt. Die Einträge werden vor Anwendung des Filters autorisiert.
+     *
+     * @param callable(PhoreUri): (bool|mixed) $fn Callback pro Eintrag.
+     * @param string|null $filter Optionales fnmatch()-Muster.
+     * @return bool true bei vollständigem Lauf, false bei Callback-Abbruch.
+     * @see self::genWalk()
+     * @example $completed = $dir->walk(static fn(PhoreUri $entry) => true); assert($completed === true);
+     */
+    public function walk(callable $fn, ?string $filter = null): bool
+    {
+        foreach ($this->genWalk($filter, false) as $entry) {
+            if ($fn($entry) === false) {
                 return false;
             }
         }
-        closedir($dirFp);
+
         return true;
     }
 
-    public function walkR(callable $fn, ?string $filter=null) : bool
-    {
-        $this->validate();
-        return $this->walk(function (PhoreUri $uri) use ($fn, $filter) {
-            if ($uri->isDirectory()) {
-                return $uri->asDirectory()->walkR($fn, $filter);
-            }
-            return $fn($uri);
-        }, $filter);
-    }
-
-
     /**
-     * @param string|null $filter
-     * @return \Iterator|PhoreUri[]
-     * @throws Exception\PathOutOfBoundsException
-     * @throws FileAccessException
-     */
-    public function genWalk(?string $filter = null, bool $recursive = false, int $recursionLimit = 999) : \Iterator
-    {
-        if ($recursionLimit < 0)
-            return;
-        $this->validate();
-        $dirFp = opendir($this->uri);
-        if (!$dirFp)
-            throw new FileAccessException("Cannot open path '{$this->uri}' for indexing.");
-        while (($curSub = readdir($dirFp)) !== false) {
-            if ($curSub == "." || $curSub == "..")
-                continue;
-
-            $path = $this->withSubPath($curSub);
-            if ($path->isDirectory() && $recursive === true) {
-                $path = $path->assertDirectory();
-
-
-                foreach ($path->genWalk($filter, $recursive, $recursionLimit-1) as $subPath) {
-                    yield $subPath;
-                }
-            }
-
-            if ($filter !== null) {
-                if ( ! fnmatch($filter, $curSub)) {
-                    continue;
-                }
-            }
-
-            if ($path->isFile())
-                $path = $path->asFile();
-            yield $path;
-        }
-        closedir($dirFp);
-    }
-
-
-    /**
-     * List all Files in Folder
+     * Besucht reguläre Dateien rekursiv über den gemeinsamen Traversierungskern.
      *
-     * @param string|null $filter
-     * @param bool $recursive
-     * @return PhoreFile[]
+     * Verzeichnisnamen werden nicht vor der Rekursion gefiltert; dadurch kann ein
+     * Dateifilter weder Verzeichnisse noch darin liegende Policy-Verstöße verstecken.
+     * Callback false beendet die Traversierung kontrolliert.
+     *
+     * @param callable(PhoreFile): (bool|mixed) $fn Callback pro regulärer Datei.
+     * @param string|null $filter Optionales fnmatch()-Muster für Dateinamen.
+     * @return bool true bei vollständigem Lauf, false bei Callback-Abbruch.
+     * @see self::genWalk()
+     * @example $completed = $dir->walkR(static fn(PhoreFile $file) => true, '*.md'); assert($completed === true);
      */
-    public function listFiles(?string $filter = null, bool $recursive = false) : array {
-        $this->validate();
-        $ret = [];
-        foreach($this->genWalk($filter, $recursive) as $path) {
-            if ( ! $path->isFile())
+    public function walkR(callable $fn, ?string $filter = null): bool
+    {
+        foreach ($this->genWalk($filter, true) as $entry) {
+            if (!$entry->isFile()) {
                 continue;
-            $ret[] = $path->asFile();
-        }
-        return $ret;
-    }
-
-    /**
-     * @param $filter
-     * @param bool $recursive
-     * @return PhoreUri[]
-     * @throws Exception\PathOutOfBoundsException
-     * @throws FileAccessException
-     */
-    public function list($filter=null, bool $recursive = false, int $recursionLimit = 999) : array
-    {
-        $this->validate();
-        $ret = [];
-        foreach($this->genWalk($filter, $recursive, $recursionLimit) as $path) {
-            $ret[] = $path;
-        }
-        return $ret;
-    }
-
-
-    /**
-     * @return PhoreUri[]|string[]
-     * @throws FileAccessException
-     */
-    public function getListSorted(?string $filter=null, bool $recursive = false, bool $returnRelPathAsString=false) : array
-    {
-        $this->validate();
-        $ret = [];
-        foreach ($this->genWalk($filter, $recursive) as $path) {
-            if ($returnRelPathAsString) {
-                $ret[] = $path->getRelPath();
-            } else {
-                $ret[] = $path;
+            }
+            if ($fn($entry->asFile()) === false) {
+                return false;
             }
         }
-        usort($ret, function ($a, $b) {
-            if ((string)$a == (string)$b)
-                return 0;
-            return ((string)$a < (string)$b) ? -1 : 1;
-        });
 
-        return $ret;
+        return true;
     }
 
     /**
-     * Import file contents of parameter 1 to this directory
+     * Iteriert Verzeichniseinträge unter den gebundenen Filesystem-Restrictions.
      *
-     * @param $filename
+     * Dateien werden als PhoreFile, Verzeichnisse als PhoreDirectory geliefert.
+     * Bei Rekursion werden Symlink-Ziele, Root-Grenzen, unterstützte Dateitypen,
+     * Cycle-Erkennung und recursionLimit geprüft, bevor ein Filter Ergebnisse ausblendet.
+     *
+     * @param string|null $filter Optionales fnmatch()-Muster für ausgegebene Einträge.
+     * @param bool $recursive Unterverzeichnisse rekursiv traversieren.
+     * @param int $recursionLimit Maximale zusätzliche Rekursionstiefe.
+     * @return \Iterator<int, PhoreUri> Autorisierte Einträge.
+     * @throws FileAccessException Wenn ein Verzeichnis nicht gelesen werden kann.
+     * @throws FilesystemException Bei Traversierungs- oder Policy-Fehlern.
+     * @see self::listFiles()
+     * @example $entries = iterator_to_array($dir->genWalk('*.md', true)); assert(is_array($entries));
+     */
+    public function genWalk(
+        ?string $filter = null,
+        bool $recursive = false,
+        int $recursionLimit = 999
+    ): \Iterator {
+        if ($recursionLimit < 0) {
+            throw new FilesystemException('recursionLimit must be zero or greater.');
+        }
+
+        $ancestors = [];
+        $identity = $this->directoryIdentity();
+        $ancestors[$identity] = true;
+
+        yield from $this->genWalkInternal(
+            $filter,
+            $recursive,
+            $recursionLimit,
+            $ancestors
+        );
+    }
+
+    /**
+     * Liefert reguläre Dateien, optional rekursiv und global nach relativem Pfad sortiert.
+     *
+     * sort='path' materialisiert die Treffer und sortiert mit strcmp() auf den
+     * slash-separierten Pfaden relativ zu diesem Verzeichnis. Alle zurückgegebenen
+     * PhoreFile-Objekte behalten rootDir und die übrigen geerbten Restrictions.
+     *
+     * @param string|null $filter Optionales fnmatch()-Muster für Dateinamen.
+     * @param bool $recursive Unterverzeichnisse rekursiv durchsuchen.
+     * @param int $recursionLimit Maximale Rekursionstiefe.
+     * @param 'path'|null $sort Optionale globale Pfadsortierung.
+     * @return list<PhoreFile> Gefundene reguläre Dateien.
+     * @throws FilesystemException Bei Traversierungs- oder Policy-Fehlern.
+     * @see self::genWalk()
+     * @see PhoreUri::getRelPath()
+     * @example $files = $dir->listFiles('*.md', recursive: true, sort: 'path'); assert(array_is_list($files));
+     */
+    public function listFiles(
+        ?string $filter = null,
+        bool $recursive = false,
+        int $recursionLimit = 999,
+        ?string $sort = null
+    ): array {
+        if ($sort !== null && $sort !== 'path') {
+            throw new \InvalidArgumentException("Unknown listFiles sort mode '$sort'.");
+        }
+
+        $files = [];
+        foreach ($this->genWalk($filter, $recursive, $recursionLimit) as $path) {
+            if ($path->isFile()) {
+                $files[] = $path->asFile();
+            }
+        }
+
+        if ($sort === 'path') {
+            usort(
+                $files,
+                fn(PhoreFile $left, PhoreFile $right): int => strcmp(
+                    $left->getRelPath($this) ?? '',
+                    $right->getRelPath($this) ?? ''
+                )
+            );
+        }
+
+        return array_values($files);
+    }
+
+    /**
+     * Materialisiert genWalk() als Liste von Dateien und Verzeichnissen.
+     *
+     * Filter, Rekursion und Security-Verhalten entsprechen genWalk(); insbesondere
+     * werden Einträge autorisiert, bevor ein Filter sie aus dem Ergebnis entfernen kann.
+     *
+     * @param string|null $filter Optionales fnmatch()-Muster.
+     * @param bool $recursive Unterverzeichnisse rekursiv traversieren.
+     * @param int $recursionLimit Maximale Rekursionstiefe.
+     * @return list<PhoreUri> Autorisierte Einträge.
+     * @throws FilesystemException Bei Traversierungs- oder Policy-Fehlern.
+     * @see self::genWalk()
+     * @example $entries = $dir->list(recursive: true); assert(array_is_list($entries));
+     */
+    public function list(
+        $filter = null,
+        bool $recursive = false,
+        int $recursionLimit = 999
+    ): array {
+        return array_values(iterator_to_array(
+            $this->genWalk($filter, $recursive, $recursionLimit),
+            false
+        ));
+    }
+
+    /**
+     * Liefert eine global nach relativem Pfad sortierte Verzeichnisliste.
+     *
+     * Mit returnRelPathAsString=true werden nur Strings zurückgegeben. Diese Strings
+     * tragen keinen FilesystemContext; für spätere sichere Dateizugriffe sind deshalb
+     * die PhoreUri-Objekte aus dem Standardmodus vorzuziehen.
+     *
+     * @param string|null $filter Optionales fnmatch()-Muster.
+     * @param bool $recursive Unterverzeichnisse rekursiv traversieren.
+     * @param bool $returnRelPathAsString Relative Pfade statt PhoreUri-Objekten zurückgeben.
+     * @return list<PhoreUri|string> Sortierte Einträge oder relative Pfade.
+     * @throws FilesystemException Bei Traversierungs- oder Policy-Fehlern.
+     * @see self::genWalk()
+     * @example $paths = $dir->getListSorted('*.md', true, true); assert(array_is_list($paths));
+     */
+    public function getListSorted(
+        ?string $filter = null,
+        bool $recursive = false,
+        bool $returnRelPathAsString = false
+    ): array {
+        $entries = $this->list($filter, $recursive);
+
+        usort(
+            $entries,
+            fn(PhoreUri $left, PhoreUri $right): int => strcmp(
+                $left->getRelPath($this) ?? '',
+                $right->getRelPath($this) ?? ''
+            )
+        );
+
+        if ($returnRelPathAsString) {
+            return array_map(
+                fn(PhoreUri $entry): string => $entry->getRelPath($this) ?? '',
+                $entries
+            );
+        }
+
+        return $entries;
+    }
+
+    /**
+     * Entpackt ein ZIP-Archiv per externem unzip-Prozess in dieses Verzeichnis.
+     *
+     * Externe Prozesse können die objektgebundene Filesystem-Policy nicht sicher
+     * durchsetzen. Deshalb ist diese Methode für rootDir-gebundene oder atomar
+     * eingeschränkte Objekte absichtlich gesperrt. Ohne solche Restrictions wird
+     * das Zielverzeichnis vor dem Prozessaufruf dennoch autorisiert.
+     *
+     * @param string|PhoreUri $filename Pfad zum ZIP-Archiv.
+     * @return void
+     * @throws UnsupportedFilesystemPolicyException Wenn externe Prozesse nicht erlaubt sind.
+     * @see PhoreUri::assertExternalProcessAllowed()
+     * @example $dir->importZipFile('/tmp/archive.zip');
      */
     public function importZipFile($filename)
     {
-        $this->validate();
-        $this->validate($filename);
-        phore_exec("unzip :zipfile -d :folder", ["zipfile" => $filename, "folder" => (string)$this]);
+        $this->assertExternalProcessAllowed('importZipFile');
+        $this->getFilesystemPathForOperation('importZipFile destination', false);
+        $this->validate((string) $filename);
+
+        phore_exec(
+            'unzip :zipfile -d :folder',
+            ['zipfile' => $filename, 'folder' => $this->accessPath]
+        );
     }
 
     /**
-     * Find a single file in the directory. Return the PhoreFile Object
-     * if found, thorws FileNotFoundException if not.
+     * Sucht rekursiv die erste reguläre Datei, deren vollständiger Pfad zum Regex passt.
      *
-     * If parameter 2 is specified, it will contain the machtes from preg_match()
+     * Die Suche verwendet listFiles() und übernimmt damit alle Traversierungs- und
+     * Security-Prüfungen. Treffer werden als gebundene PhoreFile-Objekte zurückgegeben.
      *
-     * <example>
-     * phore_dir("/tmp")->getFileByPattern("/^some[0-9]\.txt$/")->get_contents();
-     * </example>
-     *
-     * @param string $regex
-     * @param array $matches
-     * @return PhoreFile
-     * @throws FileNotFoundException
+     * @param string $regex PCRE-Muster.
+     * @param array|null $matches Optionales preg_match()-Ergebnis des Treffers.
+     * @return PhoreFile Erster passender Treffer.
+     * @throws FileNotFoundException Wenn keine Datei passt.
+     * @see self::listFiles()
+     * @example assert($dir->getFileByPattern('/composer\\.json$/')->getBasename() === 'composer.json');
      */
-    public function getFileByPattern(string $regex, &$matches = null) : PhoreFile
+    public function getFileByPattern(string $regex, &$matches = null): PhoreFile
     {
-        $this->validate();
-        $found = null;
-        $this->walkR(function (PhoreUri $uri) use ($regex, &$found, &$matches) {
-            if (preg_match($regex, (string)$uri, $matches) && $uri->isFile()) {
-                $found = $uri;
-                return false;
+        foreach ($this->listFiles(recursive: true) as $file) {
+            if (preg_match($regex, (string) $file, $matches)) {
+                return $file;
             }
-        });
-        if ($found === null)
-            throw new FileNotFoundException("No file matching pattern '$regex' found in directory '$this'");
-        return $found->asFile();
+        }
+
+        throw new FileNotFoundException(
+            "No file matching pattern '$regex' found in directory '{$this->uri}'."
+        );
     }
 
+    /**
+     * Kopiert alle regulären Dateien rekursiv in ein Zielverzeichnis.
+     *
+     * Relative Pfade werden mit getRelPath() bestimmt und im Ziel über withSubPath()
+     * neu aufgebaut. Dadurch gelten sowohl der Source- als auch der Target-Context;
+     * insbesondere können Root- oder Symlink-Grenzen nicht durch den Kopiervorgang
+     * umgangen werden.
+     *
+     * @param PhoreDirectory $targetDir Zielverzeichnis.
+     * @return void
+     * @throws FilesystemException Bei Traversierungs-, Lese- oder Schreibfehlern.
+     * @see self::moveTo()
+     * @example $source->copyTo($target); assert($target->withSubPath('file.txt')->exists());
+     */
+    public function copyTo(PhoreDirectory $targetDir): void
+    {
+        $this->getFilesystemPathForOperation('copy source directory', false);
+        $targetDir->getFilesystemPathForOperation('copy target directory', false);
 
-
-
-
-    public function copyTo(PhoreDirectory $targetDir) {
-        $this->validate();
-        $targetDir->validate();
-        $uri = phore_dir($this->uri);
-        $uri->walkR(function (PhoreUri $uri) use ($targetDir) {
-            $targetUri = $targetDir->withSubPath($uri->getRelPath());
-            $targetUri->getDirname()->assertDirectory(true);
-            if ($uri->isFile()) {
-                $targetUri->asFile()->set_contents($uri->asFile()->get_contents());
-            } else {
-                $targetUri->asDirectory()->mkdir();
+        foreach ($this->listFiles(recursive: true, sort: 'path') as $source) {
+            $relative = $source->getRelPath($this);
+            if ($relative === null) {
+                throw new FilesystemPolicyViolationException(
+                    "Cannot derive relative path while copying '{$source->getUri()}'."
+                );
             }
-        });
+
+            $target = $targetDir->withSubPath($relative)->asFile();
+            $target->mkdir()->set_contents($source->get_contents());
+        }
     }
 
-    public function moveTo(PhoreDirectory $targetDir) {
-        $this->validate();
-        $targetDir->validate();
-        $uri = phore_dir($this->uri);
-        $uri->walkR(function (PhoreUri $uri) use ($targetDir) {
-            $targetUri = $targetDir->withSubPath($uri->getRelPath());
-            if ($uri->isFile()) {
-                $targetUri->asFile()->set_contents($uri->asFile()->get_contents());
-                $uri->asFile()->unlink();
-            } else {
-                $targetUri->asDirectory()->mkdir();
+    /**
+     * Verschiebt alle regulären Dateien rekursiv in ein Zielverzeichnis.
+     *
+     * Technisch werden Dateien über die geprüften Phore-Operationen kopiert und
+     * anschließend aus der Quelle gelöscht. Source- und Target-Security-Contexts
+     * bleiben wirksam; bei einem Fehler kann daher bereits ein Teil kopiert sein.
+     *
+     * @param PhoreDirectory $targetDir Zielverzeichnis.
+     * @return void
+     * @throws FilesystemException Bei Traversierungs-, Lese-, Schreib- oder Löschfehlern.
+     * @see self::copyTo()
+     * @example $source->moveTo($target); assert($target->withSubPath('file.txt')->exists());
+     */
+    public function moveTo(PhoreDirectory $targetDir): void
+    {
+        $this->getFilesystemPathForOperation('move source directory', false);
+        $targetDir->getFilesystemPathForOperation('move target directory', false);
+
+        foreach ($this->listFiles(recursive: true, sort: 'path') as $source) {
+            $relative = $source->getRelPath($this);
+            if ($relative === null) {
+                throw new FilesystemPolicyViolationException(
+                    "Cannot derive relative path while moving '{$source->getUri()}'."
+                );
             }
-        });
+
+            $target = $targetDir->withSubPath($relative)->asFile();
+            $target->mkdir()->set_contents($source->get_contents());
+            $source->unlink();
+        }
+    }
+
+    /**
+     * @param array<string, true> $ancestors
+     * @return \Generator<int, PhoreUri>
+     */
+    private function genWalkInternal(
+        ?string $filter,
+        bool $recursive,
+        int $recursionLimit,
+        array $ancestors
+    ): \Generator {
+        $directoryPath = $this->getFilesystemPathForOperation('walk directory', false);
+        $dirFp = @opendir($directoryPath);
+        if ($dirFp === false) {
+            $message = error_get_last()['message'] ?? 'unknown error';
+            throw new FileAccessException(
+                "Cannot open path '{$this->uri}' for indexing: $message"
+            );
+        }
+
+        try {
+            while (($name = readdir($dirFp)) !== false) {
+                if ($name === '.' || $name === '..') {
+                    continue;
+                }
+
+                // The entry is authorized before any result filter is applied.
+                $entry = $this->withSubPath($name);
+                $isDirectory = $entry->isDirectory();
+                $isFile = $entry->isFile();
+
+                if (!$isDirectory && !$isFile) {
+                    throw new UnsupportedFilesystemPolicyException(
+                        "Unsupported filesystem entry '{$entry->getUri()}'."
+                    );
+                }
+
+                if ($isDirectory && $recursive) {
+                    if ($recursionLimit === 0) {
+                        throw new FilesystemException(
+                            "Recursion limit reached before entering '{$entry->getUri()}'."
+                        );
+                    }
+
+                    $directory = $entry->asDirectory();
+                    $identity = $directory->directoryIdentity();
+                    if (isset($ancestors[$identity])) {
+                        throw new FilesystemPolicyViolationException(
+                            "Directory cycle detected at '{$directory->getUri()}'."
+                        );
+                    }
+
+                    $childAncestors = $ancestors;
+                    $childAncestors[$identity] = true;
+
+                    yield from $directory->genWalkInternal(
+                        $filter,
+                        true,
+                        $recursionLimit - 1,
+                        $childAncestors
+                    );
+                }
+
+                if ($filter !== null && !fnmatch($filter, $name)) {
+                    continue;
+                }
+
+                yield $isFile ? $entry->asFile() : $entry->asDirectory();
+            }
+        } finally {
+            closedir($dirFp);
+        }
+    }
+
+    private function directoryIdentity(): string
+    {
+        $path = $this->getFilesystemPathForOperation('directory identity', false);
+        $stat = @stat($path);
+        if ($stat === false) {
+            throw new FileAccessException(
+                "Cannot stat directory '{$this->uri}' for traversal."
+            );
+        }
+
+        return (string) $stat['dev'] . ':' . (string) $stat['ino'];
     }
 }

@@ -2,65 +2,55 @@
 
 require __DIR__ . '/../vendor/autoload.php';
 
-$root = phore_dir('/tmp/phore-filesystem-dir-' . getmypid() . '-' . bin2hex(random_bytes(4)));
-$root->rmDir(true)->mkdir();
+$root = new \Phore\FileSystem\PhoreTempDir();
+$src = phore_dir((string) $root . '/src')->assertDirectory(true);
+$src->withFileName('a', 'txt')->set_contents('A');
+$src->withSubPath('sub/b.txt')->asFile()->mkdir()->set_contents('B');
 
-try {
-    // Legt ein kleines Verzeichnis mit Dateien an.
-    $src = phore_dir((string)$root . '/src')->mkdir();
-    $src->withFileName('a', 'txt')->set_contents('A');
-    $src->withSubPath('sub')->asDirectory()->mkdir();
-    $src->withSubPath('sub/b.txt')->assertFile(true)->set_contents('B');
-
-    // Iteriert rekursiv mit genWalk().
-    $genWalk = [];
-    foreach ($src->genWalk('*.txt', true) as $file) {
-        $genWalk[] = $file->getRelPath();
-    }
-    sort($genWalk);
-
-    // Listet Dateien auf verschiedenen Wegen.
-    $list = array_map(fn($u) => $u->getRelPath(), $src->list('*.txt', true));
-    $listFiles = array_map(fn($f) => $f->getRelPath(), $src->listFiles('*.txt', true));
-    $sorted = $src->getListSorted('*.txt', true, true);
-    sort($list);
-    sort($listFiles);
-    sort($sorted);
-
-    // Iteriert flach und rekursiv per Callback.
-    $walk = [];
-    $src->walk(function ($u) use (&$walk) { $walk[] = $u->getBasename(); });
-    sort($walk);
-
-    $walkR = [];
-    $src->walkR(function ($u) use (&$walkR) { if ($u->isFile()) $walkR[] = $u->getRelPath(); });
-    sort($walkR);
-
-    // Findet eine Datei per Regex.
-    $found = $src->getFileByPattern('/b\.txt$/');
-
-    // Kopiert und verschiebt ein Verzeichnis.
-    $copy = phore_dir((string)$root . '/copy')->mkdir();
-    $src->copyTo($copy);
-    $move = phore_dir((string)$root . '/move')->mkdir();
-    $move->withSubPath('sub')->asDirectory()->mkdir();
-    $copy->moveTo($move);
-
-    if (
-        $genWalk !== ['a.txt', 'sub/b.txt'] ||
-        $list !== ['a.txt', 'sub/b.txt'] ||
-        $listFiles !== ['a.txt', 'sub/b.txt'] ||
-        $sorted !== ['a.txt', 'sub/b.txt'] ||
-        $walk !== ['a.txt', 'sub'] ||
-        $walkR !== ['a.txt', 'sub/b.txt'] ||
-        $found->getBasename() !== 'b.txt' ||
-        !$move->withSubPath('sub/b.txt')->isFile() ||
-        $copy->withSubPath('sub/b.txt')->isFile()
-    ) {
-        throw new RuntimeException('Unexpected dir result');
-    }
-
-    echo "ok\n";
-} finally {
-    $root->rmDir(true);
+// Normalfall: rekursiv Dateien lesen, ohne eigene Walk-Methode oder Fehler-Wrapper.
+$contents = [];
+foreach ($src->listFiles('*.txt', recursive: true, sort: 'path') as $file) {
+    $contents[$file->getRelPath($src)] = $file->get_contents();
 }
+assert($contents === ['a.txt' => 'A', 'sub/b.txt' => 'B']);
+
+// Alternative: Eintraege schrittweise verarbeiten statt eine Dateiliste zu materialisieren.
+$genWalk = [];
+foreach ($src->genWalk('*.txt', true) as $entry) {
+    $genWalk[] = $entry->assertFile()->getRelPath();
+}
+sort($genWalk);
+
+$list = array_map(fn($entry) => $entry->getRelPath(), $src->list('*.txt', true));
+$sorted = $src->getListSorted('*.txt', true, true);
+sort($list);
+
+// Callback-Varianten: walk() ist flach; walkR() besucht rekursiv die Blaetter.
+$walk = [];
+$src->walk(function ($entry) use (&$walk) {
+    $walk[] = $entry->getBasename();
+});
+sort($walk);
+
+$walkR = [];
+$src->walkR(function ($entry) use (&$walkR) {
+    $walkR[] = $entry->assertFile()->getRelPath();
+});
+sort($walkR);
+$found = $src->getFileByPattern('/b\\.txt$/');
+
+$copy = $root->withSubPath('copy')->assertDirectory(true);
+$src->copyTo($copy);
+$move = $root->withSubPath('move')->assertDirectory(true);
+$move->withSubPath('sub')->assertDirectory(true);
+$copy->moveTo($move);
+$move->withSubPath('sub/b.txt')->assertFile();
+
+assert($genWalk === ['a.txt', 'sub/b.txt']);
+assert($list === ['a.txt', 'sub/b.txt'] && $sorted === ['a.txt', 'sub/b.txt']);
+assert($walk === ['a.txt', 'sub'] && $walkR === ['a.txt', 'sub/b.txt']);
+assert($found->getBasename() === 'b.txt');
+assert(!$copy->withSubPath('sub/b.txt')->exists());
+
+// Root-/Symlink-Sicherheit wird im eigenen Beispiel phore_security.php gezeigt.
+echo "ok\n";

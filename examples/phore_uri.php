@@ -2,46 +2,41 @@
 
 require __DIR__ . '/../vendor/autoload.php';
 
-$root = phore_dir('/tmp/phore-filesystem-uri-' . getmypid() . '-' . bin2hex(random_bytes(4)));
-$root->rmDir(true)->mkdir();
+$root = new \Phore\FileSystem\PhoreTempDir();
 
-try {
-    // Erstellt sicher ein Verzeichnis und eine Datei unter /tmp.
-    $dir = phore_uri((string)$root)->withSubPath('sub')->assertDirectory(true)->assertReadable()->assertWritable();
-    $file = phore_uri((string)$root)->withSubPath('sub/demo.txt')->assertFile(true)->set_contents('x');
+// assertDirectory(true) verlangt ein Verzeichnis und darf es bei Bedarf anlegen.
+// Ohne true wird ein fehlendes Verzeichnis als Fehler durchgereicht.
+$dir = $root->withSubPath('sub')->assertDirectory(true);
+$file = $dir->withFileName('demo', 'txt')->set_contents('x');
 
-    // Baut und normalisiert Pfade.
-    $clean = phore_uri((string)$root . '//sub/./demo.txt')->clean();
-    $join = phore_uri((string)$root)->join('sub', 'demo.txt');
-    $joinSecure = phore_uri((string)$root)->join_secure('space name');
-    $relative = $file->withRelativePath('../other.txt');
-    $abs = phore_uri('sub/demo.txt')->abs((string)$root);
-    $rel = $file->rel((string)$root);
+// Explizite Voraussetzungen: Assert statt if (!is_...) { throw ...; }.
+$dir->assertReadable()->assertWritable();
+$existingFile = $root->withSubPath('sub/demo.txt')->assertFile();
 
-    // Wechselt generisch zwischen Uri-, File- und Dir-Objekten.
-    $asFile = $file->asFile();
-    $asDir = $dir->asDirectory();
+// asFile()/asDirectory() wechseln nur den Objekttyp, sie bestaetigen keine Existenz.
+$futureDirectory = $root->withSubPath('later')->asDirectory();
+$futureDirectory->mkdir();
+$futureFile = $futureDirectory->withSubPath('note.txt')->asFile();
+$futureFile->set_contents('neu');
+$text = $existingFile->get_contents();
+assert($text === 'x');
 
-    // Prüft Muster und Subpfade.
-    $isSubpath = $file->isSubpathOf((string)$root);
-    $matches = $file->fnmatch('*.txt');
+$clean = phore_uri((string) $root . '//sub/./demo.txt')->clean();
+$join = $root->join('sub', 'demo.txt');
+$joinSecure = $root->join_secure('space name');
+$relative = $file->withRelativePath('../other.txt');
+$abs = phore_uri('sub/demo.txt')->abs((string) $root);
+$rel = $file->rel((string) $root);
 
-    if (
-        (string)$clean !== (string)$file ||
-        (string)$join !== (string)$file ||
-        $joinSecure->getBasename() !== 'space+name' ||
-        (string)$relative !== (string)$root . '/other.txt' ||
-        (string)$abs !== (string)$file ||
-        (string)$rel !== 'sub/demo.txt' ||
-        !$asFile->isFile() ||
-        !$asDir->isDirectory() ||
-        !$isSubpath ||
-        !$matches
-    ) {
-        throw new RuntimeException('Unexpected uri result');
-    }
+// Ohne rootDir ist dies ein unbeschraenkter Neueinstieg. Sobald ein Root gebunden
+// ist, behalten withSubPath(), rel() und Typwechsel den Sicherheitskontext.
+$isSubpath = $file->isSubpathOf((string) $root);
+$matches = $file->fnmatch('*.txt');
 
-    echo "ok\n";
-} finally {
-    $root->rmDir(true);
-}
+assert((string) $clean === (string) $file && (string) $join === (string) $file);
+assert($joinSecure->getBasename() === 'space+name');
+assert((string) $relative === (string) $root . '/other.txt');
+assert((string) $abs === (string) $file && (string) $rel === 'sub/demo.txt');
+assert($isSubpath && $matches);
+
+echo "ok\n";
