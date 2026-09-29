@@ -31,7 +31,6 @@ Der normale Zugriff mit lokaler Policy sieht so aus: [geändert]
 ```php
 $docs = phore_dir('/srv/site/docs', options: [
     'rootDir' => '/srv/site/docs',
-    'followSymlinks' => false,
 ])->assertDirectory();
 
 $config = $docs->withSubPath('.shiller.yml')->asFile()->get_yaml();
@@ -54,11 +53,10 @@ use Phore\FileSystem\FilesystemOptions;
 
 $filesystemOptions = FilesystemOptions::fromAssoc([
     'rootDir' => '/srv/site/docs',
-    'followSymlinks' => false,
 ]);
 
 $docs = phore_dir('/srv/site/docs', options: $filesystemOptions)->assertDirectory();
-$config = phore_file($docs->withSubPath('.shiller.yml'), options: $filesystemOptions)->get_yaml();
+$config = phore_file('/srv/site/docs/.shiller.yml', options: $filesystemOptions)->get_yaml();
 ```
 
 `FilesystemOptions::fromAssoc()` validiert unbekannte Keys, Werttypen und unzulässige Kombinationen strikt und wirft dafür eine passende Exception; es findet kein stilles PHP-Casting wie `'false'` zu `true` statt. `FilesystemOptions::from(array|FilesystemOptions|null $options)` gibt ein bestehendes Options-Objekt unverändert zurück, delegiert Arrays an `fromAssoc()` und erzeugt für `null` die Defaults. [neu]
