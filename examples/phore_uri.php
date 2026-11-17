@@ -20,6 +20,22 @@ try {
     assert($exception->getMessage() === 'Unsafe request path');
 }
 
+// rel() liefert eine relative URI. formatUri() erzeugt daraus einen
+// absoluten URL-Pfad, ohne "." oder Slashes im Consumer selbst zu behandeln.
+$routePath = phore_uri('/app/users')->rel('/app')->formatUri(leadingSlash: true);
+$baseRoute = phore_uri('/app')->rel('/app')->formatUri(leadingSlash: true);
+$directoryUrl = phore_uri('/app/users/')->rel('/app')->formatUri(
+    leadingSlash: true,
+    trailingSlash: true
+);
+assert($routePath === '/users');
+assert($baseRoute === '/');
+assert($directoryUrl === '/users/');
+
+// Null lässt die Randslashes unverändert; true/false setzt genau einen/keinen.
+assert(phore_uri('///assets///')->formatUri(true, true) === '/assets/');
+assert(phore_uri('///assets///')->formatUri(false, false) === 'assets');
+
 // Bei asFile() und asDirectory() werden die Filesystem-Checks ausgeführt.
 
 $root = new \Phore\FileSystem\PhoreTempDir();
