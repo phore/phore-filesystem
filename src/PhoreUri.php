@@ -730,6 +730,76 @@ class PhoreUri
     }
 
     /**
+     * Formatiert ausschließlich die führenden und abschließenden URI-Slashes.
+     *
+     * Je Option erhält null die bisherige Randdarstellung, true erzwingt genau
+     * einen Slash und false entfernt alle Slashes am jeweiligen Rand.
+     * Standardmäßig werden innere Dot-Segmente und doppelte Slashes wie bei
+     * clean() rein lexikalisch normalisiert; clean=false deaktiviert das.
+     * Ein einzelner "."-Pfad bedeutet die relative Basis: unverändert ".",
+     * bei leadingSlash=true "/", bei trailingSlash=true ohne Leading "./".
+     * Für einen leeren Root-Pfad wird "/" nie verdoppelt.
+     *
+     * Diese Methode ist insbesondere nach rel($prefix) für URL-Routen
+     * vorgesehen, damit Consumer ".", führende und abschließende Slashes
+     * nicht selbst per String-Operation nachbearbeiten müssen. rel() entfernt
+     * allerdings bereits den ursprünglichen abschließenden Slash; diesen bei
+     * Verzeichnis-URLs mit trailingSlash=true ausdrücklich anfordern.
+     *
+     * Die Ausgabe ist ein String ohne FilesystemContext; das Objekt wird
+     * weder verändert noch werden Dateisystemzugriffe ausgeführt.
+     *
+     * @param bool|null $leadingSlash null: beibehalten, true: genau einer, false: keiner.
+     * @param bool|null $trailingSlash null: beibehalten, true: genau einer, false: keiner.
+     * @param bool $clean Pfad vor der Ausgabe lexikalisch normalisieren (Standard true).
+     * @return string Formatierte sichtbare URI.
+     * @see self::getUri()
+     * @see self::rel()
+     * @see self::clean()
+     * @example assert(phore_uri('/app/users')->rel('/app')->formatUri(leadingSlash: true) === '/users');
+     */
+    public function formatUri(
+        ?bool $leadingSlash = null,
+        ?bool $trailingSlash = null,
+        bool $clean = true
+    ): string {
+        $uri = $this->getUri();
+
+        if ($clean && $uri !== '.') {
+            // Die Randdarstellung bleibt bei null trotz der Normalisierung erhalten.
+            $hadTrailingSlash = str_ends_with($uri, '/');
+            $uri = self::normalizeDisplayPath($uri);
+            if ($trailingSlash === null && $hadTrailingSlash && $uri !== '/' && $uri !== '') {
+                $uri .= '/';
+            }
+        }
+
+        if ($uri === '.') {
+            if ($leadingSlash === true) {
+                return '/';
+            }
+
+            return $trailingSlash === true ? './' : '.';
+        }
+
+        if ($leadingSlash !== null) {
+            $uri = ltrim($uri, '/');
+            if ($leadingSlash) {
+                $uri = '/' . $uri;
+            }
+        }
+
+        if ($trailingSlash !== null) {
+            $uri = rtrim($uri, '/');
+            if ($trailingSlash) {
+                $uri .= '/';
+            }
+        }
+
+        return $leadingSlash === true && $uri === '' ? '/' : $uri;
+    }
+
+    /**
      * Gibt den sichtbaren URI als String zurück.
      *
      * Achtung: Durch die String-Konvertierung gehen gebundene Security-Policies
