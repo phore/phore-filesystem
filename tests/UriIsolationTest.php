@@ -230,7 +230,7 @@ namespace Test {
         public static function invalidSubpaths(): iterable
         {
             foreach (['', '../outside', 'a/../../outside', '/', '/outside', '//host/path', '.', 'a/..', 'https://host/path', 'a\\b', "a\0b"] as $path) {
-                yield bin2hex($path) => [$path];
+                yield 'path ' . bin2hex($path) => [$path];
             }
         }
 
@@ -285,7 +285,7 @@ namespace Test {
         public static function invalidUrlPaths(): iterable
         {
             foreach (['', 'relative/main.ts', './main.ts', '../main.ts', 'https://host/main.ts', '//host/main.ts', '/demo/main.ts?q=1', '/demo/main.ts#fragment', '/demo\\main.ts', "/demo/\tmain.ts", "/demo/\rmain.ts", "/demo/\nmain.ts", "/demo/\x01main.ts", "/demo/\x7fmain.ts"] as $path) {
-                yield bin2hex($path) => [$path];
+                yield 'path ' . bin2hex($path) => [$path];
             }
         }
 
