@@ -302,9 +302,9 @@ class PhoreUri
         $relative = $this->assertRelativePath($subpath);
         $displayBase = $this instanceof PhoreFile ? dirname($this->uri) : $this->uri;
         $accessBase = $this instanceof PhoreFile ? dirname($this->accessPath) : $this->accessPath;
-        $access = $this->filesystemContext === null
-            ? rtrim($accessBase, '/') . '/' . $subpath
-            : $this->filesystemContext->resolveSubPath($accessBase, $subpath);
+        $access = $this instanceof PhoreFile || $this instanceof PhoreDirectory
+            ? $this->filesystemContext->resolveSubPath($accessBase, $subpath)
+            : rtrim($accessBase, '/') . '/' . $subpath;
         $display = self::joinDisplayPath($displayBase, $relative);
 
         $relPath = $this->relPath ?? [];
@@ -340,9 +340,9 @@ class PhoreUri
 
         $displayBase = $this instanceof PhoreFile ? dirname($this->uri) : $this->uri;
         $accessBase = $this instanceof PhoreFile ? dirname($this->accessPath) : $this->accessPath;
-        $access = $this->filesystemContext === null
-            ? rtrim($accessBase, '/') . '/' . $relpath
-            : $this->filesystemContext->resolveRelative($accessBase, $relpath);
+        $access = $this instanceof PhoreFile || $this instanceof PhoreDirectory
+            ? $this->filesystemContext->resolveRelative($accessBase, $relpath)
+            : rtrim($accessBase, '/') . '/' . $relpath;
         $display = self::normalizeDisplayPath(rtrim($displayBase, '/') . '/' . $relpath);
 
         return $this->spawn(PhoreUri::class, $display, $access, null);
@@ -792,9 +792,7 @@ class PhoreUri
         }
 
         $display = rtrim($cwd, '/') . '/' . $this->uri;
-        $access = $this->filesystemContext === null
-            ? $display
-            : $this->filesystemContext->resolveInputPath($display);
+        $access = $display;
 
         return $this->spawn(PhoreUri::class, $display, $access, $this->relPath);
     }
