@@ -29,15 +29,18 @@ class PhoreUri
      */
     protected ?array $relPath = null;
 
-    protected FilesystemContext $filesystemContext;
+    protected ?FilesystemContext $filesystemContext = null;
+
+    protected FilesystemOptions $filesystemOptions;
 
     /**
-     * Erzeugt einen URI und bindet die Filesystem-Restrictions an das Objekt.
+     * Erzeugt eine abstrakte URI ohne Dateisystemzugriff.
      *
      * Wird ein bestehendes PhoreUri übergeben, werden dessen Restrictions vollständig
      * geerbt; null oder [] setzen sie nicht zurück. Ein String ist ein neuer Entry-Point
      * mit den Defaults followSymlinks=true, allowHardLinks=true und ohne rootDir.
-     * Bei gesetzter rootDir dürfen auch aufgelöste Symlink-Ziele diese Root nicht verlassen.
+     * Die Filesystem-Restrictions werden beim Übergang in PhoreFile oder
+     * PhoreDirectory geprüft; die rohe Pfadherkunft bleibt bis dahin erhalten.
      *
      * @param string|PhoreUri $uri Pfad oder bereits gebundenes Phore-Objekt.
      * @param string[]|null $__relPath Interne relative Pfadhistorie.
@@ -59,24 +62,17 @@ class PhoreUri
             $this->uri = $uri->uri;
             $this->accessPath = $uri->accessPath;
             $this->relPath = $__relPath ?? $uri->relPath;
-            $this->filesystemContext = $uri->filesystemContext->derive($this->accessPath, $options);
-            $this->validate();
-
-            return;
-        }
-
-        $this->uri = $uri;
-        $this->relPath = $__relPath;
-
-        if ($__context === null) {
-            $this->filesystemContext = FilesystemContext::create($options);
-            $this->accessPath = $__accessPath
-                ?? $this->filesystemContext->resolveInputPath($uri);
+            $this->filesystemContext = $uri->filesystemContext;
+            $this->filesystemOptions = self::inheritFilesystemOptions($uri->filesystemOptions, $options);
         } else {
-            $candidatePath = $__accessPath
-                ?? $__context->resolveInputPath($uri);
-            $this->filesystemContext = $__context->derive($candidatePath, $options);
-            $this->accessPath = $candidatePath;
+            $this->uri = $uri;
+            $this->accessPath = $__accessPath ?? $uri;
+            $this->relPath = $__relPath;
+            $this->filesystemContext = $__context;
+            $baseOptions = $__context?->getOptions();
+            $this->filesystemOptions = $baseOptions === null
+                ? FilesystemOptions::from($options)
+                : self::inheritFilesystemOptions($baseOptions, $options);
         }
 
         $this->validate();
@@ -151,7 +147,7 @@ class PhoreUri
      */
     public function getFilesystemOptions(): FilesystemOptions
     {
-        return $this->filesystemContext->getOptions();
+        return $this->filesystemOptions;
     }
 
     /**
@@ -163,6 +159,8 @@ class PhoreUri
         string $operation,
         bool $allowMissingLeaf = true
     ): string {
+        $this->bindFilesystem();
+
         return $this->filesystemContext->assertAccess(
             $this->accessPath,
             $operation,
@@ -175,6 +173,7 @@ class PhoreUri
      */
     public function assertRawResourceExportAllowed(): void
     {
+        $this->bindFilesystem();
         $this->filesystemContext->assertRawResourceExportAllowed();
     }
 
@@ -183,15 +182,15 @@ class PhoreUri
      */
     public function assertExternalProcessAllowed(string $operation): void
     {
+        $this->bindFilesystem();
         $this->filesystemContext->assertExternalProcessAllowed($operation);
     }
 
     /**
      * Normalisiert doppelte Slashes sowie "."- und ".."-Segmente in der Darstellung.
      *
-     * Die gebundenen Filesystem-Restrictions bleiben erhalten. clean() ist keine
-     * Möglichkeit, Root- oder Symlink-Prüfungen zu umgehen; der normalisierte
-     * Zugriffspfad wird beim erzeugten Objekt erneut über den Context abgeleitet.
+     * Bei PhoreUri ist die Bereinigung rein lexikalisch. PhoreFile und
+     * PhoreDirectory prüfen ihren Zugriffspfad wie bisher im Constructor.
      *
      * @return self Normalisiertes Objekt desselben Typs.
      * @see self::withSubPath()
@@ -200,9 +199,7 @@ class PhoreUri
     public function clean(): self
     {
         $display = self::normalizeDisplayPath($this->uri);
-        $access = FilesystemContext::normalizeAbsolutePath($this->accessPath);
-
-        return $this->spawn(static::class, $display, $access, $this->relPath);
+        return $this->spawn(static::class, $display, $this->accessPath, $this->relPath);
     }
 
     /**
@@ -305,7 +302,9 @@ class PhoreUri
         $relative = $this->assertRelativePath($subpath);
         $displayBase = $this instanceof PhoreFile ? dirname($this->uri) : $this->uri;
         $accessBase = $this instanceof PhoreFile ? dirname($this->accessPath) : $this->accessPath;
-        $access = $this->filesystemContext->resolveSubPath($accessBase, $subpath);
+        $access = $this instanceof PhoreFile || $this instanceof PhoreDirectory
+            ? $this->filesystemContext->resolveSubPath($accessBase, $subpath)
+            : rtrim($accessBase, '/') . '/' . $subpath;
         $display = self::joinDisplayPath($displayBase, $relative);
 
         $relPath = $this->relPath ?? [];
@@ -341,7 +340,9 @@ class PhoreUri
 
         $displayBase = $this instanceof PhoreFile ? dirname($this->uri) : $this->uri;
         $accessBase = $this instanceof PhoreFile ? dirname($this->accessPath) : $this->accessPath;
-        $access = $this->filesystemContext->resolveRelative($accessBase, $relpath);
+        $access = $this instanceof PhoreFile || $this instanceof PhoreDirectory
+            ? $this->filesystemContext->resolveRelative($accessBase, $relpath)
+            : rtrim($accessBase, '/') . '/' . $relpath;
         $display = self::normalizeDisplayPath(rtrim($displayBase, '/') . '/' . $relpath);
 
         return $this->spawn(PhoreUri::class, $display, $access, null);
@@ -434,6 +435,7 @@ class PhoreUri
      */
     public function isDirectory(): bool
     {
+        $this->bindFilesystem();
         $path = $this->filesystemContext->assertAccess($this->accessPath, 'isDirectory', true);
 
         return is_dir($path);
@@ -451,6 +453,7 @@ class PhoreUri
      */
     public function isFile(): bool
     {
+        $this->bindFilesystem();
         $path = $this->filesystemContext->assertAccess($this->accessPath, 'isFile', true);
 
         return is_file($path);
@@ -469,6 +472,7 @@ class PhoreUri
      */
     public function exists(): bool
     {
+        $this->bindFilesystem();
         $path = $this->filesystemContext->assertAccess($this->accessPath, 'exists', true);
 
         return file_exists($path) || is_link($path);
@@ -788,7 +792,7 @@ class PhoreUri
         }
 
         $display = rtrim($cwd, '/') . '/' . $this->uri;
-        $access = $this->filesystemContext->resolveInputPath($display);
+        $access = $display;
 
         return $this->spawn(PhoreUri::class, $display, $access, $this->relPath);
     }
@@ -986,7 +990,7 @@ class PhoreUri
         return new $class(
             $displayPath,
             $relPath,
-            $options,
+            $options ?? $this->filesystemOptions,
             $this->filesystemContext,
             $accessPath
         );
@@ -1004,9 +1008,48 @@ class PhoreUri
         return $this->spawn(
             PhoreFile::class,
             $target,
-            $this->filesystemContext->resolveInputPath($target),
+            $this->filesystemContext === null
+                ? $target
+                : $this->filesystemContext->resolveInputPath($target),
             null
         );
+    }
+
+    /**
+     * Bindet einen abstrakten URI erst beim Übergang zu File/Directory oder
+     * bei einer ausdrücklich angeforderten Dateisystemoperation.
+     */
+    protected function bindFilesystem(): void
+    {
+        $context = $this->filesystemContext
+            ?? FilesystemContext::create($this->filesystemOptions);
+        // Den rohen Pfad prüfen, bevor ".." oder Symlinks normalisiert werden.
+        $access = $context->resolveInputPath($this->accessPath);
+        $this->filesystemContext = $context->getOptions()->toArray() === $this->filesystemOptions->toArray()
+            ? $context
+            : $context->derive($access, $this->filesystemOptions);
+        $this->accessPath = $access;
+    }
+
+    private static function inheritFilesystemOptions(
+        FilesystemOptions $parent,
+        array|FilesystemOptions|null $options
+    ): FilesystemOptions {
+        $next = $options instanceof FilesystemOptions
+            ? $options
+            : FilesystemOptions::patch($parent, $options ?? []);
+
+        if (
+            ($parent->rootDir !== null && ($next->rootDir === null
+                || !FilesystemContext::isWithin($next->rootDir, $parent->rootDir)))
+            || (!$parent->followSymlinks && $next->followSymlinks)
+            || (!$parent->allowHardLinks && $next->allowHardLinks)
+            || ($parent->requireAtomicContainment && !$next->requireAtomicContainment)
+        ) {
+            throw new FilesystemPolicyViolationException('Filesystem restrictions cannot be relaxed.');
+        }
+
+        return $next;
     }
 
     protected function adoptPath(PhoreUri $target): void
@@ -1015,6 +1058,7 @@ class PhoreUri
         $this->accessPath = $target->accessPath;
         $this->relPath = $target->relPath;
         $this->filesystemContext = $target->filesystemContext;
+        $this->filesystemOptions = $target->filesystemOptions;
     }
 
     /**

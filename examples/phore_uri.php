@@ -2,6 +2,12 @@
 
 require __DIR__ . '/../vendor/autoload.php';
 
+// Eine PhoreUri ist nur ein Pfadstring; clean() benötigt kein Dateisystem.
+$uri = phore_uri('/demo/src/../main.ts')->clean();
+assert($uri->getUri() === '/demo/main.ts');
+
+// Bei asFile() und asDirectory() werden die Filesystem-Checks ausgeführt.
+
 $root = new \Phore\FileSystem\PhoreTempDir();
 
 // assertDirectory(true) verlangt ein Verzeichnis und darf es bei Bedarf anlegen.
