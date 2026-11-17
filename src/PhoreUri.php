@@ -733,8 +733,9 @@ class PhoreUri
      * Formatiert ausschließlich die führenden und abschließenden URI-Slashes.
      *
      * Je Option erhält null die bisherige Randdarstellung, true erzwingt genau
-     * einen Slash und false entfernt alle Slashes am jeweiligen Rand. Innere
-     * Segmente bleiben unverändert; zur Normalisierung dient clean().
+     * einen Slash und false entfernt alle Slashes am jeweiligen Rand.
+     * Standardmäßig werden innere Dot-Segmente und doppelte Slashes wie bei
+     * clean() rein lexikalisch normalisiert; clean=false deaktiviert das.
      * Ein einzelner "."-Pfad bedeutet die relative Basis: unverändert ".",
      * bei leadingSlash=true "/", bei trailingSlash=true ohne Leading "./".
      * Für einen leeren Root-Pfad wird "/" nie verdoppelt.
@@ -750,15 +751,28 @@ class PhoreUri
      *
      * @param bool|null $leadingSlash null: beibehalten, true: genau einer, false: keiner.
      * @param bool|null $trailingSlash null: beibehalten, true: genau einer, false: keiner.
+     * @param bool $clean Pfad vor der Ausgabe lexikalisch normalisieren (Standard true).
      * @return string Formatierte sichtbare URI.
      * @see self::getUri()
      * @see self::rel()
      * @see self::clean()
      * @example assert(phore_uri('/app/users')->rel('/app')->formatUri(leadingSlash: true) === '/users');
      */
-    public function formatUri(?bool $leadingSlash = null, ?bool $trailingSlash = null): string
-    {
+    public function formatUri(
+        ?bool $leadingSlash = null,
+        ?bool $trailingSlash = null,
+        bool $clean = true
+    ): string {
         $uri = $this->getUri();
+
+        if ($clean && $uri !== '.') {
+            // Die Randdarstellung bleibt bei null trotz der Normalisierung erhalten.
+            $hadTrailingSlash = str_ends_with($uri, '/');
+            $uri = self::normalizeDisplayPath($uri);
+            if ($trailingSlash === null && $hadTrailingSlash && $uri !== '/' && $uri !== '') {
+                $uri .= '/';
+            }
+        }
 
         if ($uri === '.') {
             if ($leadingSlash === true) {

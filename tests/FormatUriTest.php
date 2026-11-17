@@ -8,11 +8,23 @@ use PHPUnit\Framework\TestCase;
 
 final class FormatUriTest extends TestCase
 {
-    public function testDefaultsPreserveVisibleUri(): void
+    public function testDefaultCleansWhileCleanFalsePreservesOriginal(): void
     {
-        foreach (['.', '/', 'users', 'users/', '/users/', '//users///', '/users//profile'] as $input) {
+        $cases = [
+            '.' => '.',
+            '/' => '/',
+            'users' => 'users',
+            'users/' => 'users/',
+            '/users/' => '/users/',
+            '//users///' => '/users/',
+            '/users//profile' => '/users/profile',
+            '/a/./b/../c/' => '/a/c/',
+        ];
+
+        foreach ($cases as $input => $expected) {
             $uri = phore_uri($input);
-            self::assertSame($input, $uri->formatUri(), $input);
+            self::assertSame($expected, $uri->formatUri(), $input);
+            self::assertSame($input, $uri->formatUri(clean: false), $input);
             self::assertSame($input, $uri->getUri());
         }
     }
@@ -40,7 +52,24 @@ final class FormatUriTest extends TestCase
         self::assertSame('users/', phore_uri('///users///')->formatUri(false, true));
         self::assertSame('users', phore_uri('///users///')->formatUri(false, false));
         self::assertSame('/users/', phore_uri('users')->formatUri(true, true));
-        self::assertSame('/users//profile/', phore_uri('/users//profile')->formatUri(true, true));
+        self::assertSame('/users/profile/', phore_uri('/users//profile')->formatUri(true, true));
+    }
+
+    public function testCleaningCanBeDisabledWithoutChangingBoundaryFormatting(): void
+    {
+        $uri = phore_uri('/app/./users//profile/');
+
+        self::assertSame('/app/users/profile/', $uri->formatUri(leadingSlash: true));
+        self::assertSame('/app/./users//profile/', $uri->formatUri(
+            leadingSlash: true,
+            clean: false
+        ));
+        self::assertSame('app/./users//profile/', $uri->formatUri(
+            leadingSlash: false,
+            trailingSlash: true,
+            clean: false
+        ));
+        self::assertSame('/app/./users//profile/', $uri->getUri());
     }
 
     public function testRelativeBaseDotUsesRootRepresentation(): void

@@ -32,6 +32,10 @@ assert($routePath === '/users');
 assert($baseRoute === '/');
 assert($directoryUrl === '/users/');
 
+// Standardmäßig normalisieren, per clean:false bei Bedarf nur formatieren.
+assert(phore_uri('/app/./assets//app.js')->formatUri(leadingSlash: true) === '/app/assets/app.js');
+assert(phore_uri('/app/./assets//app.js')->formatUri(leadingSlash: true, clean: false) === '/app/./assets//app.js');
+
 // Null lässt die Randslashes unverändert; true/false setzt genau einen/keinen.
 assert(phore_uri('///assets///')->formatUri(true, true) === '/assets/');
 assert(phore_uri('///assets///')->formatUri(false, false) === 'assets');
