@@ -2,9 +2,19 @@
 
 require __DIR__ . '/../vendor/autoload.php';
 
-// Eine PhoreUri ist nur ein Pfadstring; clean() benötigt kein Dateisystem.
+// Vertrauenswürdige Konfiguration normalisieren; kein Dateisystemzugriff.
 $uri = phore_uri('/demo/src/../main.ts')->clean();
 assert($uri->getUri() === '/demo/main.ts');
+
+// Bereits dekodierte Request-Pfade dagegen unverändert und strikt prüfen.
+$requestPath = phore_uri('/demo/assets/main.js')->assertClean();
+assert($requestPath->getUri() === '/demo/assets/main.js');
+try {
+    phore_uri('/demo/../secret.js')->assertClean(new \InvalidArgumentException('Unsafe request path'));
+    throw new \LogicException('Unclean path was accepted');
+} catch (\InvalidArgumentException $exception) {
+    assert($exception->getMessage() === 'Unsafe request path');
+}
 
 // Bei asFile() und asDirectory() werden die Filesystem-Checks ausgeführt.
 
