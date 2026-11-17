@@ -992,7 +992,7 @@ class PhoreUri
         return new $class(
             $displayPath,
             $relPath,
-            $options,
+            $options ?? $this->filesystemOptions,
             $this->filesystemContext,
             $accessPath
         );
