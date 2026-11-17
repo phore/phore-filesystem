@@ -32,54 +32,64 @@ class PhoreUri
     protected FilesystemContext $filesystemContext;
 
     /**
-     * Erzeugt einen URI und bindet die Filesystem-Restrictions an das Objekt.
+     * Unveränderte Herkunft für die erste tatsächliche Dateisystemauflösung.
+     */
+    protected FilesystemPath $filesystemPath;
+
+    /**
+     * Erzeugt eine Pfaddarstellung ohne Dateisystemabfragen.
      *
      * Wird ein bestehendes PhoreUri übergeben, werden dessen Restrictions vollständig
      * geerbt; null oder [] setzen sie nicht zurück. Ein String ist ein neuer Entry-Point
      * mit den Defaults followSymlinks=true, allowHardLinks=true und ohne rootDir.
-     * Bei gesetzter rootDir dürfen auch aufgelöste Symlink-Ziele diese Root nicht verlassen.
+     * Die ursprünglichen Pfade und Restrictions bleiben bis zum Dateizugriff
+     * erhalten. PhoreFile und PhoreDirectory lösen bereits im constructor auf;
+     * reine PhoreUri-Objekte erst beim Typwechsel oder einer Dateisystemoperation.
+     * Explizite relative rootDir-Optionen werden wie bisher auf getcwd() bezogen.
      *
      * @param string|PhoreUri $uri Pfad oder bereits gebundenes Phore-Objekt.
      * @param string[]|null $__relPath Interne relative Pfadhistorie.
      * @param array{rootDir?: string|null, followSymlinks?: bool, allowHardLinks?: bool, requireAtomicContainment?: bool}|FilesystemOptions|null $options Filesystem-Policy.
      * @param FilesystemContext|null $__context Interner geerbter Context.
      * @param string|null $__accessPath Interner bereits aufgelöster Zugriffspfad.
+     * @param FilesystemPath|null $__filesystemPath Interne Herkunft der Ableitung.
      * @throws FilesystemException Bei ungültigem Pfad oder Policy-Verstoß.
      * @see FilesystemOptions::fromAssoc()
-     * @example $uri = phore_uri('/srv/site/docs', options: ['rootDir' => '/srv/site/docs']); assert($uri->getFilesystemOptions()->rootDir === '/srv/site/docs');
+     * @example assert(phore_uri('/demo/src/../main.ts')->clean()->getUri() === '/demo/main.ts');
      */
     public function __construct(
         string|PhoreUri $uri,
         ?array $__relPath = null,
         array|FilesystemOptions|null $options = null,
         ?FilesystemContext $__context = null,
-        ?string $__accessPath = null
+        ?string $__accessPath = null,
+        ?FilesystemPath $__filesystemPath = null
     ) {
+        // URI-Operationen behalten die Herkunft, ohne sie am Dateisystem zu prüfen.
         if ($uri instanceof PhoreUri) {
             $this->uri = $uri->uri;
-            $this->accessPath = $uri->accessPath;
             $this->relPath = $__relPath ?? $uri->relPath;
-            $this->filesystemContext = $uri->filesystemContext->derive($this->accessPath, $options);
-            $this->validate();
-
-            return;
-        }
-
-        $this->uri = $uri;
-        $this->relPath = $__relPath;
-
-        if ($__context === null) {
-            $this->filesystemContext = FilesystemContext::create($options);
-            $this->accessPath = $__accessPath
-                ?? $this->filesystemContext->resolveInputPath($uri);
+            $this->filesystemPath = $uri->filesystemPath->derive($options);
         } else {
-            $candidatePath = $__accessPath
-                ?? $__context->resolveInputPath($uri);
-            $this->filesystemContext = $__context->derive($candidatePath, $options);
-            $this->accessPath = $candidatePath;
+            $this->uri = $uri;
+            $this->relPath = $__relPath;
+            if ($__filesystemPath !== null) {
+                $this->filesystemPath = $__filesystemPath->derive($options);
+            } elseif ($__context !== null) {
+                $this->filesystemPath = FilesystemPath::bound(
+                    $__context,
+                    $__accessPath ?? $uri
+                )->derive($options);
+            } else {
+                $this->filesystemPath = FilesystemPath::entry($__accessPath ?? $uri, $options);
+            }
         }
-
         $this->validate();
+
+        // Datei- und Verzeichnisobjekte behalten die bisherigen sofortigen Checks.
+        if ($this instanceof PhoreFile || $this instanceof PhoreDirectory) {
+            $this->bindFilesystem();
+        }
     }
 
     /**
@@ -123,6 +133,7 @@ class PhoreUri
             return $this->relPath === null ? null : implode('/', $this->relPath);
         }
 
+        $this->bindFilesystem();
         $basePath = rtrim($base->accessPath, '/');
         $path = rtrim($this->accessPath, '/');
 
@@ -139,11 +150,12 @@ class PhoreUri
     }
 
     /**
-     * Liefert den unveränderlichen Snapshot der aktuell gebundenen Filesystem-Policy.
+     * Liefert den unveränderlichen Snapshot der vorgesehenen Filesystem-Policy.
      *
      * Damit kann Anwendungscode nachvollziehen, ob beispielsweise eine rootDir-
      * Begrenzung aktiv ist oder Symlinks verfolgt werden. Der zurückgegebene
-     * Snapshot verändert den Context des Objekts nicht.
+     * Snapshot verändert den Context des Objekts nicht. Bei reinen URIs werden
+     * dateisystemabhängige Vererbungsprüfungen erst beim ersten Zugriff ausgeführt.
      *
      * @return FilesystemOptions Aktuell wirksame Optionen.
      * @see FilesystemOptions
@@ -151,7 +163,7 @@ class PhoreUri
      */
     public function getFilesystemOptions(): FilesystemOptions
     {
-        return $this->filesystemContext->getOptions();
+        return $this->filesystemPath->getOptions();
     }
 
     /**
@@ -163,6 +175,8 @@ class PhoreUri
         string $operation,
         bool $allowMissingLeaf = true
     ): string {
+        $this->bindFilesystem();
+
         return $this->filesystemContext->assertAccess(
             $this->accessPath,
             $operation,
@@ -175,6 +189,7 @@ class PhoreUri
      */
     public function assertRawResourceExportAllowed(): void
     {
+        $this->bindFilesystem();
         $this->filesystemContext->assertRawResourceExportAllowed();
     }
 
@@ -183,33 +198,49 @@ class PhoreUri
      */
     public function assertExternalProcessAllowed(string $operation): void
     {
+        $this->bindFilesystem();
         $this->filesystemContext->assertExternalProcessAllowed($operation);
     }
 
     /**
-     * Normalisiert doppelte Slashes sowie "."- und ".."-Segmente in der Darstellung.
+     * Bereinigt die Pfaddarstellung; reine PhoreUri-Objekte führen dabei kein I/O aus.
      *
-     * Die gebundenen Filesystem-Restrictions bleiben erhalten. clean() ist keine
-     * Möglichkeit, Root- oder Symlink-Prüfungen zu umgehen; der normalisierte
-     * Zugriffspfad wird beim erzeugten Objekt erneut über den Context abgeleitet.
+     * Standardmäßig werden doppelte Slashes sowie "." und ".." zusammengefasst.
+     * urlPath=true behandelt eine absolute lokale HTTP-Pfadkomponente: ganze
+     * percent-encodierte Dot-Segmente werden erkannt, leere Segmente und der
+     * abschließende Slash bleiben erhalten; encodierte Separatoren bleiben wörtlich.
+     * Query, Fragment, Host und Scheme gehören nicht zu dieser Pfadkomponente.
+     * PhoreFile und PhoreDirectory erlauben nur den Standardmodus und prüfen
+     * weiterhin die vollständige Dateisystemauflösung. Der ursprüngliche rohe
+     * Zugriffspfad und alle Restrictions bleiben auch nach clean() erhalten.
      *
+     * @param bool $urlPath Browser-Dot-Segmente einer absoluten URL-Pfadkomponente bereinigen.
      * @return self Normalisiertes Objekt desselben Typs.
+     * @throws \InvalidArgumentException Bei ungeeigneter Eingabe für urlPath=true.
+     * @throws FilesystemException Bei einer ungültigen File-/Directory-Auflösung.
      * @see self::withSubPath()
+     * @see https://url.spec.whatwg.org/#single-dot-path-segment
      * @example assert((string) phore_uri('/tmp//a/./b')->clean() === '/tmp/a/b');
+     * @example assert(phore_uri('/demo/src/../main.ts')->clean(urlPath: true)->getUri() === '/demo/main.ts');
      */
-    public function clean(): self
+    public function clean(bool $urlPath = false): self
     {
-        $display = self::normalizeDisplayPath($this->uri);
-        $access = FilesystemContext::normalizeAbsolutePath($this->accessPath);
+        if ($urlPath && ($this instanceof PhoreFile || $this instanceof PhoreDirectory)) {
+            throw new \InvalidArgumentException('URL path cleaning requires a PhoreUri, not a filesystem object.');
+        }
+        $display = $urlPath
+            ? self::normalizeUrlPath($this->uri)
+            : self::normalizeDisplayPath($this->uri);
 
-        return $this->spawn(static::class, $display, $access, $this->relPath);
+        return $this->spawn(static::class, $display, $this->filesystemPath, $this->relPath);
     }
 
     /**
      * Liefert den übergeordneten Pfad als PhoreUri und übernimmt den Security-Context.
      *
      * Bei root-gebundenen Objekten darf der abgeleitete Parent die gebundene Root
-     * nicht verlassen; andernfalls wird die Ableitung durch die Policy abgewiesen.
+     * nicht verlassen; diese Policy wird spätestens beim Dateizugriff geprüft.
+     * Die reine URI-Ableitung führt keine Dateisystemabfrage aus.
      *
      * @return self URI des übergeordneten Verzeichnisses.
      * @throws FilesystemPolicyViolationException Bei Verletzung einer geerbten Policy.
@@ -221,7 +252,7 @@ class PhoreUri
         return $this->spawn(
             PhoreUri::class,
             dirname($this->uri),
-            dirname($this->accessPath),
+            $this->filesystemPath->parent(),
             $this->parentRelPath()
         );
     }
@@ -280,7 +311,7 @@ class PhoreUri
         return $this->spawn(
             PhoreDirectory::class,
             dirname($this->uri),
-            dirname($this->accessPath),
+            $this->filesystemPath->parent(),
             $this->parentRelPath()
         );
     }
@@ -292,6 +323,8 @@ class PhoreUri
      * der aufgelöste Pfad gegen die Basis geprüft: Symlinks sind standardmäßig
      * erlaubt, dürfen bei withSubPath() aber auch ohne rootDir nicht aus der
      * aktuellen Basis herausführen. Eine zusätzliche rootDir-Policy bleibt wirksam.
+     * File-/Directory-Ableitungen prüfen sofort; reine URIs bewahren die Prüfung
+     * bis zum ersten Typwechsel oder Dateizugriff ohne vorzeitige I/O auf.
      *
      * @param string $subpath Relativer Unterpfad.
      * @return PhoreUri Abgeleiteter URI mit geerbtem Security-Context.
@@ -304,8 +337,7 @@ class PhoreUri
     {
         $relative = $this->assertRelativePath($subpath);
         $displayBase = $this instanceof PhoreFile ? dirname($this->uri) : $this->uri;
-        $accessBase = $this instanceof PhoreFile ? dirname($this->accessPath) : $this->accessPath;
-        $access = $this->filesystemContext->resolveSubPath($accessBase, $subpath);
+        $path = $this->filesystemPath->relative($subpath, $this instanceof PhoreFile, subpath: true);
         $display = self::joinDisplayPath($displayBase, $relative);
 
         $relPath = $this->relPath ?? [];
@@ -315,7 +347,7 @@ class PhoreUri
             }
         }
 
-        return $this->spawn(PhoreUri::class, $display, $access, $relPath);
+        return $this->spawn(PhoreUri::class, $display, $path, $relPath);
     }
 
     /**
@@ -326,6 +358,8 @@ class PhoreUri
      * vollständig aktiv und verhindert sowohl lexikalische als auch aufgelöste
      * Symlink-Escapes. Verwende withSubPath(), wenn der Pfad zwingend unterhalb
      * der aktuellen Basis bleiben soll.
+     * Reine URIs berechnen nur die Darstellung und bewahren die vollständige
+     * rohe Ableitung für die spätere Dateisystemprüfung auf.
      *
      * @param string $relpath Nicht-leerer relativer Pfad.
      * @return PhoreUri Abgeleiteter URI mit geerbtem Security-Context.
@@ -340,11 +374,18 @@ class PhoreUri
         }
 
         $displayBase = $this instanceof PhoreFile ? dirname($this->uri) : $this->uri;
-        $accessBase = $this instanceof PhoreFile ? dirname($this->accessPath) : $this->accessPath;
-        $access = $this->filesystemContext->resolveRelative($accessBase, $relpath);
+        if (
+            str_starts_with($relpath, '/')
+            || str_contains($relpath, "\0")
+            || str_contains($relpath, '\\')
+            || preg_match('/^[a-zA-Z][a-zA-Z0-9+.-]*:/', $relpath)
+        ) {
+            throw new PathOutOfBoundsException("Invalid relative path '$relpath'.");
+        }
+        $path = $this->filesystemPath->relative($relpath, $this instanceof PhoreFile);
         $display = self::normalizeDisplayPath(rtrim($displayBase, '/') . '/' . $relpath);
 
-        return $this->spawn(PhoreUri::class, $display, $access, null);
+        return $this->spawn(PhoreUri::class, $display, $path, null);
     }
 
     /**
@@ -434,7 +475,7 @@ class PhoreUri
      */
     public function isDirectory(): bool
     {
-        $path = $this->filesystemContext->assertAccess($this->accessPath, 'isDirectory', true);
+        $path = $this->getFilesystemPathForOperation('isDirectory', true);
 
         return is_dir($path);
     }
@@ -451,7 +492,7 @@ class PhoreUri
      */
     public function isFile(): bool
     {
-        $path = $this->filesystemContext->assertAccess($this->accessPath, 'isFile', true);
+        $path = $this->getFilesystemPathForOperation('isFile', true);
 
         return is_file($path);
     }
@@ -469,7 +510,7 @@ class PhoreUri
      */
     public function exists(): bool
     {
-        $path = $this->filesystemContext->assertAccess($this->accessPath, 'exists', true);
+        $path = $this->getFilesystemPathForOperation('exists', true);
 
         return file_exists($path) || is_link($path);
     }
@@ -611,7 +652,7 @@ class PhoreUri
         $result = $this->spawn(
             static::class,
             $this->uri,
-            $this->accessPath,
+            $this->filesystemPath,
             $this->relPath,
             ['followSymlinks' => false]
         );
@@ -705,7 +746,7 @@ class PhoreUri
      */
     public function asFile(): PhoreFile
     {
-        return $this->spawn(PhoreFile::class, $this->uri, $this->accessPath, $this->relPath);
+        return $this->spawn(PhoreFile::class, $this->uri, $this->filesystemPath, $this->relPath);
     }
 
     /**
@@ -727,6 +768,8 @@ class PhoreUri
             $element = ltrim((string) $element, '/');
             $path = $path->withSubPath($element);
         }
+
+        $this->checkFilesystemDerivation($path->filesystemPath);
 
         return $path;
     }
@@ -761,6 +804,8 @@ class PhoreUri
             $path = $path->withSubPath($element);
         }
 
+        $this->checkFilesystemDerivation($path->filesystemPath);
+
         return $path;
     }
 
@@ -768,7 +813,9 @@ class PhoreUri
      * Wandelt einen relativen URI in einen absoluten URI um.
      *
      * Für bereits absolute Pfade wird nur ein gleichwertiges Objekt erzeugt. Bei
-     * relativen Pfaden greift nach der Auflösung erneut der gebundene Security-Context.
+     * relativen Pfaden bleibt die neue Basis Teil der späteren Dateisystemprüfung.
+     * Mit explizitem cwd bleibt die URI-Ableitung unabhängig vom Dateisystem;
+     * ohne cwd wird wie bisher das Arbeitsverzeichnis mit getcwd() abgefragt.
      *
      * @param string|null $cwd Optionales Basisverzeichnis, sonst getcwd().
      * @return PhoreUri Absoluter URI.
@@ -779,7 +826,7 @@ class PhoreUri
     public function abs(?string $cwd = null): PhoreUri
     {
         if (str_starts_with($this->uri, '/')) {
-            return $this->spawn(PhoreUri::class, $this->uri, $this->accessPath, $this->relPath);
+            return $this->spawn(PhoreUri::class, $this->uri, $this->filesystemPath, $this->relPath);
         }
 
         $cwd ??= getcwd();
@@ -788,9 +835,9 @@ class PhoreUri
         }
 
         $display = rtrim($cwd, '/') . '/' . $this->uri;
-        $access = $this->filesystemContext->resolveInputPath($display);
+        $path = $this->filesystemPath->anchor($cwd, $display);
 
-        return $this->spawn(PhoreUri::class, $display, $access, $this->relPath);
+        return $this->spawn(PhoreUri::class, $display, $path, $this->relPath);
     }
 
     /**
@@ -808,7 +855,7 @@ class PhoreUri
     public function rel(string $rootPath): PhoreUri
     {
         if (!str_starts_with($this->uri, '/')) {
-            return $this->spawn(PhoreUri::class, $this->uri, $this->accessPath, $this->relPath);
+            return $this->spawn(PhoreUri::class, $this->uri, $this->filesystemPath, $this->relPath);
         }
 
         $rootPath = rtrim(self::normalizeDisplayPath($rootPath), '/');
@@ -824,7 +871,7 @@ class PhoreUri
             $display = '.';
         }
 
-        return $this->spawn(PhoreUri::class, $display, $this->accessPath, $this->relPath);
+        return $this->spawn(PhoreUri::class, $display, $this->filesystemPath, $this->relPath);
     }
 
     /**
@@ -901,11 +948,9 @@ class PhoreUri
 
         $suffix = $fileExtension === '' ? '' : '.' . $fileExtension;
         $display = $this->uri;
-        $access = $this->accessPath;
 
         if ($replaceExistingExtension) {
             $display = preg_replace('/\.[a-z0-9]+$/i', '', $display) ?? $display;
-            $access = preg_replace('/\.[a-z0-9]+$/i', '', $access) ?? $access;
         }
 
         $relPath = $this->relPath;
@@ -920,7 +965,7 @@ class PhoreUri
         return $this->spawn(
             PhoreFile::class,
             $display . $suffix,
-            $access . $suffix,
+            $this->filesystemPath->suffix($suffix, $replaceExistingExtension),
             $relPath
         );
     }
@@ -946,7 +991,7 @@ class PhoreUri
         return $this->spawn(
             PhoreDirectory::class,
             $display,
-            dirname($this->accessPath),
+            $this->filesystemPath->parent(),
             $this->parentRelPath()
         );
     }
@@ -961,7 +1006,7 @@ class PhoreUri
      */
     public function asDirectory(): PhoreDirectory
     {
-        return $this->spawn(PhoreDirectory::class, $this->uri, $this->accessPath, $this->relPath);
+        return $this->spawn(PhoreDirectory::class, $this->uri, $this->filesystemPath, $this->relPath);
     }
 
     /**
@@ -979,16 +1024,17 @@ class PhoreUri
     protected function spawn(
         string $class,
         string $displayPath,
-        string $accessPath,
+        FilesystemPath $path,
         ?array $relPath,
         array|FilesystemOptions|null $options = null
     ): PhoreUri {
+        $this->checkFilesystemDerivation($path);
+
         return new $class(
             $displayPath,
             $relPath,
             $options,
-            $this->filesystemContext,
-            $accessPath
+            __filesystemPath: $path
         );
     }
 
@@ -1001,10 +1047,13 @@ class PhoreUri
             return $target->asFile();
         }
 
+        // Ein Rename-Ziel darf nach dem Umbenennen nicht vom alten Namen abhängen.
+        $this->bindFilesystem();
+
         return $this->spawn(
             PhoreFile::class,
             $target,
-            $this->filesystemContext->resolveInputPath($target),
+            FilesystemPath::bound($this->filesystemContext, $target),
             null
         );
     }
@@ -1015,6 +1064,52 @@ class PhoreUri
         $this->accessPath = $target->accessPath;
         $this->relPath = $target->relPath;
         $this->filesystemContext = $target->filesystemContext;
+        $this->filesystemPath = $target->filesystemPath;
+    }
+
+    private function bindFilesystem(): void
+    {
+        [$this->filesystemContext, $this->accessPath] = $this->filesystemPath->resolve();
+    }
+
+    private function checkFilesystemDerivation(FilesystemPath $path): FilesystemPath
+    {
+        if ($this instanceof PhoreFile || $this instanceof PhoreDirectory) {
+            $path->resolve();
+        }
+
+        return $path;
+    }
+
+    private static function normalizeUrlPath(string $path): string
+    {
+        if (
+            !str_starts_with($path, '/')
+            || str_starts_with($path, '//')
+            || strpbrk($path, "\\?#") !== false
+            || preg_match('/[\x00-\x1f\x7f]/', $path)
+        ) {
+            throw new \InvalidArgumentException('Expected an absolute local URL path without query, fragment or controls.');
+        }
+
+        // Nur vollständige Dot-Segmente dekodieren; %2F bleibt Teil eines Namens.
+        $segments = explode('/', substr($path, 1));
+        $resolved = [];
+        foreach ($segments as $index => $segment) {
+            $dotSegment = rawurldecode($segment);
+            if ($dotSegment === '.' || $dotSegment === '..') {
+                if ($dotSegment === '..') {
+                    array_pop($resolved);
+                }
+                if ($index === array_key_last($segments)) {
+                    $resolved[] = '';
+                }
+                continue;
+            }
+            $resolved[] = $segment;
+        }
+
+        return '/' . implode('/', $resolved);
     }
 
     /**
@@ -1042,7 +1137,11 @@ class PhoreUri
                 continue;
             }
             if ($part === '..') {
-                array_pop($parts);
+                if ($parts !== [] && end($parts) !== '..') {
+                    array_pop($parts);
+                } elseif (!$absolute) {
+                    $parts[] = '..';
+                }
                 continue;
             }
             $parts[] = $part;

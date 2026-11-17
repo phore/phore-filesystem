@@ -2,6 +2,18 @@
 
 require __DIR__ . '/../vendor/autoload.php';
 
+// SPA-Development-Pfade aufräumen: Dafür muss kein lokales Verzeichnis existieren.
+$developmentPath = phore_uri('/demo/src/../main.ts')->clean()->getUri();
+assert($developmentPath === '/demo/main.ts');
+
+// Der URL-Modus erhält leere Segmente und erkennt auch encodierte Dot-Segmente.
+// Query und Fragment vorab trennen; Mount und relative URL sind bereits kombiniert.
+$configuredUrl = '/demo/%2e%2e/src/main.ts?build=42#entry';
+$urlPath = parse_url($configuredUrl, PHP_URL_PATH);
+$browserPath = phore_uri($urlPath)->clean(urlPath: true)->getUri();
+assert($browserPath === '/src/main.ts');
+
+// Erst echte File-/Directory-Operationen binden und prüfen das Dateisystem.
 $root = new \Phore\FileSystem\PhoreTempDir();
 
 // assertDirectory(true) verlangt ein Verzeichnis und darf es bei Bedarf anlegen.
