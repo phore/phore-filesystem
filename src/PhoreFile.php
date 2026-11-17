@@ -24,6 +24,28 @@ use Phore\Hydrator\Ex\InvalidStructureException;
 
 class PhoreFile extends PhoreUri
 {
+    /**
+     * Bindet den Dateisystempfad und prüft die geerbten Restrictions.
+     *
+     * @param string|PhoreUri $uri URI oder bereits gebundener Pfad.
+     * @param string[]|null $__relPath Interne Pfadhistorie.
+     * @param array|FilesystemOptions|null $options Dateisystemrestriktionen.
+     * @param FilesystemContext|null $__context Geerbter Kontext.
+     * @param string|null $__accessPath Unveränderter Zugriffspfad.
+     * @see PhoreUri::clean()
+     * @example $entry = new PhoreFile('/tmp');
+     */
+    public function __construct(
+        string|PhoreUri $uri,
+        ?array $__relPath = null,
+        array|FilesystemOptions|null $options = null,
+        ?FilesystemContext $__context = null,
+        ?string $__accessPath = null
+    ) {
+        parent::__construct($uri, $__relPath, $options, $__context, $__accessPath);
+        $this->bindFilesystem();
+    }
+
 
     private $unlinkOnClose = false;
 
