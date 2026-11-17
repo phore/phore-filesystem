@@ -30,6 +30,22 @@ final class AssertCleanTest extends TestCase
         }
     }
 
+    public function testIsCleanMatchesAssertCleanWithoutChangingUri(): void
+    {
+        foreach (['/', '/demo/', '/demo/assets/app.js', 'relative/file', '/a.../b', 'a%2e%2e/b'] as $value) {
+            $uri = phore_uri($value);
+            self::assertTrue($uri->isClean(), $value);
+            self::assertSame($uri, $uri->assertClean());
+            self::assertSame($value, $uri->getUri());
+        }
+
+        foreach (['/a/../b', '/a/./b', '../a', '/a//b', '/a\\b', "/a\n/b"] as $value) {
+            $uri = phore_uri($value);
+            self::assertFalse($uri->isClean(), $value);
+            self::assertSame($value, $uri->getUri());
+        }
+    }
+
     public function testThrowsProvidedExceptionInstance(): void
     {
         $custom = new \InvalidArgumentException('Invalid incoming request');

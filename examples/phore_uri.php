@@ -6,7 +6,11 @@ require __DIR__ . '/../vendor/autoload.php';
 $uri = phore_uri('/demo/src/../main.ts')->clean();
 assert($uri->getUri() === '/demo/main.ts');
 
-// Bereits dekodierte Request-Pfade dagegen unverändert und strikt prüfen.
+// Bereits dekodierte Request-Pfade ohne Exceptions prüfen.
+assert(phore_uri('/demo/assets/main.js')->isClean());
+assert(!phore_uri('/demo/../secret.js')->isClean());
+
+// Für fluente Aufrufe bleibt assertClean() verfügbar.
 $requestPath = phore_uri('/demo/assets/main.js')->assertClean();
 assert($requestPath->getUri() === '/demo/assets/main.js');
 try {

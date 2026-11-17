@@ -187,28 +187,44 @@ class PhoreUri
     }
 
     /**
-     * Prüft die URI unverändert und ohne Dateisystemzugriff.
+     * Prüft, ob die sichtbare URI ohne Bereinigung verwendbar ist.
      *
-     * Einzelne "."- und ".."-Segmente, doppelte Slashes, Backslashes und
-     * Steuerzeichen sind verboten. Ein einzelner abschließender Slash bleibt
-     * für Verzeichnis- und HTTP-Routen erlaubt. Prozentkodierung wird nicht
-     * dekodiert; HTTP-Aufrufer müssen vorab selbst einmalig dekodieren.
+     * Einzelne "."- oder ".."-Segmente, doppelte Slashes, Backslashes und
+     * Steuerzeichen gelten als unclean. Ein einzelner abschließender Slash
+     * bleibt gültig. Es findet weder Dateisystemzugriff noch URL-Decoding
+     * statt; HTTP-Aufrufer müssen Encodings vorher gesondert prüfen.
      *
-     * @param \Throwable|null $exception Optional unverändert zu werfende Exception.
-     * @return static Dasselbe Objekt bei einer gültigen URI.
-     * @throws PathOutOfBoundsException Ohne eigene Exception bei ungültigem Pfad.
+     * @return bool True bei rein lexikalisch sauberer URI.
+     * @see self::assertClean()
      * @see self::clean()
-     * @example $path = phore_uri('/demo/assets/app.js')->assertClean()->getUri();
+     * @example assert(phore_uri('/demo/app.js')->isClean() === true);
      */
-    public function assertClean(?\Throwable $exception = null): static
+    public function isClean(): bool
     {
-        if (
+        return !(
             str_contains($this->uri, '//')
             || str_contains($this->uri, '\\')
             || preg_match('/[\x00-\x1f\x7f]/', $this->uri)
             || in_array('.', explode('/', $this->uri), true)
             || in_array('..', explode('/', $this->uri), true)
-        ) {
+        );
+    }
+
+    /**
+     * Prüft die URI ohne Normalisierung oder Dateisystemzugriff.
+     *
+     * Verwendet dieselbe lexikalische Prüfung wie isClean(). Eine optionale
+     * Exception-Instanz wird bei einem ungültigen URI unverändert geworfen.
+     *
+     * @param \Throwable|null $exception Optional unverändert zu werfende Exception.
+     * @return static Dasselbe Objekt bei einer gültigen URI.
+     * @throws PathOutOfBoundsException Ohne eigene Exception bei ungültigem Pfad.
+     * @see self::isClean()
+     * @example $path = phore_uri('/demo/assets/app.js')->assertClean()->getUri();
+     */
+    public function assertClean(?\Throwable $exception = null): static
+    {
+        if (!$this->isClean()) {
             throw $exception ?? new PathOutOfBoundsException("URI '{$this->uri}' is not clean.");
         }
 
