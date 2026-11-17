@@ -1025,7 +1025,9 @@ class PhoreUri
             ?? FilesystemContext::create($this->filesystemOptions);
         // Den rohen Pfad prüfen, bevor ".." oder Symlinks normalisiert werden.
         $access = $context->resolveInputPath($this->accessPath);
-        $this->filesystemContext = $context->derive($access, $this->filesystemOptions);
+        $this->filesystemContext = $context->getOptions()->toArray() === $this->filesystemOptions->toArray()
+            ? $context
+            : $context->derive($access, $this->filesystemOptions);
         $this->accessPath = $access;
     }
 
